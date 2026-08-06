@@ -1,0 +1,2709 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { 
+  Trophy, 
+  Clock, 
+  Play, 
+  Pause, 
+  RotateCcw, 
+  Plus, 
+  Trash2, 
+  Users, 
+  MapPin, 
+  Calendar, 
+  Award, 
+  ChevronRight, 
+  Flag, 
+  Zap,
+  CheckCircle,
+  AlertTriangle,
+  User,
+  ShieldAlert,
+  Sliders,
+  RefreshCw,
+  Share2,
+  Check,
+  Lock,
+  Unlock,
+  Edit3,
+  Save,
+  X,
+  Shield,
+  Key,
+  BookOpen,
+  ArrowUpDown,
+  QrCode
+} from 'lucide-react';
+
+let app, auth, db, appId;
+const hasFirebase = typeof __firebase_config !== 'undefined';
+
+if (hasFirebase) {
+  try {
+    const firebaseConfig = JSON.parse(__firebase_config);
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  } catch (e) {
+    console.error("Firebase Initialisierungsfehler:", e);
+  }
+}
+
+const initialTeams = [
+  { id: '1', number: '1', name: 'Team Ackerschreck', p1: 'Hannes', p2: 'Dennis', pin: '1111', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, penalties: 0, penaltyReason: '', customPoints: 0, assignedRefId: 'ref1' },
+  { id: '2', number: '2', name: 'Rostlaube Racing', p1: 'Max', p2: 'Lukas', pin: '2222', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, penalties: 0, penaltyReason: '', customPoints: 0, assignedRefId: 'ref1' },
+  { id: '3', number: '3', name: 'Koppel-Heizer', p1: 'Jan', p2: 'Malte', pin: '3333', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, penalties: 0, penaltyReason: '', customPoints: 0, assignedRefId: 'ref2' },
+  { id: '4', number: '4', name: 'Biernot Motorsport', p1: 'Lisa', p2: 'Svenja', pin: '4444', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, penalties: 0, penaltyReason: '', customPoints: 0, assignedRefId: 'ref2' },
+  { id: '5', number: '5', name: 'Die Schrottplatz-Könige', p1: 'Kalle', p2: 'Ralle', pin: '5555', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, penalties: 0, penaltyReason: '', customPoints: 0, assignedRefId: '' },
+  { id: '6', number: '6', name: 'Kolbenfresser-Crew', p1: 'Steffen', p2: 'Arne', pin: '6666', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, penalties: 0, penaltyReason: '', customPoints: 0, assignedRefId: '' },
+  { id: '7', number: '7', name: 'Kattberger Turbo', p1: 'Flo', p2: 'Eike', pin: '7777', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, penalties: 0, penaltyReason: '', customPoints: 0, assignedRefId: '' },
+  { id: '8', number: '8', name: 'Wiesen-Wühler', p1: 'Tobi', p2: 'Sören', pin: '8888', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, penalties: 0, penaltyReason: '', customPoints: 0, assignedRefId: '' }
+];
+
+const initialReferees = [
+  { id: 'ref1', name: 'Schiri Nord', pin: '1111' },
+  { id: 'ref2', name: 'Schiri Süd', pin: '2222' }
+];
+
+const generateInitialBracket = (teamList) => {
+  const N = teamList.length;
+  if (N < 4) return null;
+
+  const ids = teamList.map(t => t.id).sort(() => Math.random() - 0.5);
+
+  if (N > 8) {
+    const numR1Matches = N - 8;
+    const numSeeded = 16 - N;
+    const seeded = ids.slice(0, numSeeded);
+    const r1Players = ids.slice(numSeeded);
+
+    const r1Matches = [];
+    for (let i = 0; i < numR1Matches; i++) {
+      r1Matches.push({ id: `r1_m${i}`, t1: r1Players[i * 2] || '', t2: r1Players[i * 2 + 1] || '', winner: '' });
+    }
+
+    const r2Sources = [];
+    seeded.forEach(id => r2Sources.push({ type: 'seeded', value: id }));
+    for (let i = 0; i < numR1Matches; i++) {
+      r2Sources.push({ type: 'winner', round: 'r1', index: i });
+    }
+
+    const r2Matches = [];
+    for (let i = 0; i < 4; i++) {
+      r2Matches.push({ id: `r2_m${i}`, t1: '', t2: '', winner: '' });
+    }
+
+    return {
+      totalRounds: 4,
+      seeded,
+      r2Sources,
+      r1: r1Matches,
+      r2: r2Matches,
+      r3: [
+        { id: 'r3_m0', t1: '', t2: '', winner: '' },
+        { id: 'r3_m1', t1: '', t2: '', winner: '' }
+      ],
+      r4: {
+        finale: { id: 'r4_finale', t1: '', t2: '', winner: '' },
+        platz3: { id: 'r4_p3', t1: '', t2: '', winner: '' }
+      }
+    };
+  } else if (N >= 5) {
+    const numR1Matches = N - 4;
+    const numSeeded = 8 - N;
+    const seeded = ids.slice(0, numSeeded);
+    const r1Players = ids.slice(numSeeded);
+
+    const r1Matches = [];
+    for (let i = 0; i < numR1Matches; i++) {
+      r1Matches.push({ id: `r1_m${i}`, t1: r1Players[i * 2] || '', t2: r1Players[i * 2 + 1] || '', winner: '' });
+    }
+
+    const r2Sources = [];
+    seeded.forEach(id => r2Sources.push({ type: 'seeded', value: id }));
+    for (let i = 0; i < numR1Matches; i++) {
+      r2Sources.push({ type: 'winner', round: 'r1', index: i });
+    }
+
+    const r2Matches = [];
+    for (let i = 0; i < 2; i++) {
+      r2Matches.push({ id: `r2_m${i}`, t1: '', t2: '', winner: '' });
+    }
+
+    return {
+      totalRounds: 3,
+      seeded,
+      r2Sources,
+      r1: r1Matches,
+      r2: r2Matches,
+      r4: {
+        finale: { id: 'r4_finale', t1: '', t2: '', winner: '' },
+        platz3: { id: 'r4_p3', t1: '', t2: '', winner: '' }
+      }
+    };
+  } else {
+    return {
+      totalRounds: 2,
+      seeded: [],
+      r2Sources: [],
+      r1: [
+        { id: 'r1_m0', t1: ids[0] || '', t2: ids[1] || '', winner: '' },
+        { id: 'r1_m1', t1: ids[2] || '', t2: ids[3] || '', winner: '' }
+      ],
+      r4: {
+        finale: { id: 'r4_finale', t1: '', t2: '', winner: '' },
+        platz3: { id: 'r4_p3', t1: '', t2: '', winner: '' }
+      }
+    };
+  }
+};
+
+const computeTournamentTree = (bracketState) => {
+  if (!bracketState) return null;
+  const b = JSON.parse(JSON.stringify(bracketState));
+  
+  const getSourceTeamId = (source) => {
+    if (!source) return '';
+    if (source.type === 'seeded') return source.value;
+    if (source.type === 'winner') {
+      if (source.round === 'r1') return b.r1?.[source.index]?.winner || '';
+      if (source.round === 'r2') return b.r2?.[source.index]?.winner || '';
+    }
+    return '';
+  };
+
+  const getMatchLoserId = (match) => {
+    if (!match || !match.winner) return '';
+    return match.winner === match.t1 ? match.t2 : match.t1;
+  };
+
+  if (b.totalRounds === 4) {
+    if (b.r2) {
+      b.r2.forEach((match, idx) => {
+        match.t1 = getSourceTeamId(b.r2Sources?.[idx * 2]);
+        match.t2 = getSourceTeamId(b.r2Sources?.[idx * 2 + 1]);
+        if (match.winner && match.winner !== match.t1 && match.winner !== match.t2) match.winner = '';
+      });
+    }
+    if (b.r3) {
+      b.r3[0].t1 = b.r2?.[0]?.winner || '';
+      b.r3[0].t2 = b.r2?.[1]?.winner || '';
+      b.r3[1].t1 = b.r2?.[2]?.winner || '';
+      b.r3[1].t2 = b.r2?.[3]?.winner || '';
+      b.r3.forEach(match => {
+        if (match.winner && match.winner !== match.t1 && match.winner !== match.t2) match.winner = '';
+      });
+    }
+    if (b.r4) {
+      b.r4.finale.t1 = b.r3?.[0]?.winner || '';
+      b.r4.finale.t2 = b.r3?.[1]?.winner || '';
+      if (b.r4.finale.winner && b.r4.finale.winner !== b.r4.finale.t1 && b.r4.finale.winner !== b.r4.finale.t2) b.r4.finale.winner = '';
+
+      b.r4.platz3.t1 = getMatchLoserId(b.r3?.[0]);
+      b.r4.platz3.t2 = getMatchLoserId(b.r3?.[1]);
+      if (b.r4.platz3.winner && b.r4.platz3.winner !== b.r4.platz3.t1 && b.r4.platz3.winner !== b.r4.platz3.t2) b.r4.platz3.winner = '';
+    }
+  } else if (b.totalRounds === 3) {
+    if (b.r2) {
+      b.r2.forEach((match, idx) => {
+        match.t1 = getSourceTeamId(b.r2Sources?.[idx * 2]);
+        match.t2 = getSourceTeamId(b.r2Sources?.[idx * 2 + 1]);
+        if (match.winner && match.winner !== match.t1 && match.winner !== match.t2) match.winner = '';
+      });
+    }
+    if (b.r4) {
+      b.r4.finale.t1 = b.r2?.[0]?.winner || '';
+      b.r4.finale.t2 = b.r2?.[1]?.winner || '';
+      if (b.r4.finale.winner && b.r4.finale.winner !== b.r4.finale.t1 && b.r4.finale.winner !== b.r4.finale.t2) b.r4.finale.winner = '';
+
+      b.r4.platz3.t1 = getMatchLoserId(b.r2?.[0]);
+      b.r4.platz3.t2 = getMatchLoserId(b.r2?.[1]);
+      if (b.r4.platz3.winner && b.r4.platz3.winner !== b.r4.platz3.t1 && b.r4.platz3.winner !== b.r4.platz3.t2) b.r4.platz3.winner = '';
+    }
+  } else if (b.totalRounds === 2) {
+    if (b.r4) {
+      b.r4.finale.t1 = b.r1?.[0]?.winner || '';
+      b.r4.finale.t2 = b.r1?.[1]?.winner || '';
+      if (b.r4.finale.winner && b.r4.finale.winner !== b.r4.finale.t1 && b.r4.finale.winner !== b.r4.finale.t2) b.r4.finale.winner = '';
+
+      b.r4.platz3.t1 = getMatchLoserId(b.r1?.[0]);
+      b.r4.platz3.t2 = getMatchLoserId(b.r1?.[1]);
+      if (b.r4.platz3.winner && b.r4.platz3.winner !== b.r4.platz3.t1 && b.r4.platz3.winner !== b.r4.platz3.t2) b.r4.platz3.winner = '';
+    }
+  }
+
+  return b;
+};
+
+export default function App() {
+  const [teams, setTeams] = useState(initialTeams);
+  const [bracket, setBracket] = useState(() => generateInitialBracket(initialTeams));
+  const [referees, setReferees] = useState(initialReferees);
+  const [adminPin, setAdminPin] = useState('24977');
+  const [isRaceReleased, setIsRaceReleased] = useState(false);
+  
+  const [activeTab, setActiveTab] = useState('leaderboard');
+  const [activeCatchMeRound, setActiveCatchMeRound] = useState('r1');
+  const [bestLapSortMode, setBestLapSortMode] = useState('number');
+
+  // Role system: 'viewer' | 'admin' | 'referee' | 'team'
+  const [role, setRole] = useState('viewer'); 
+  const [activeRefId, setActiveRefId] = useState(''); 
+  const [activeTeamId, setActiveTeamId] = useState('');
+
+  // Login Modal State
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [loginType, setLoginType] = useState('admin');
+  const [selectedRefId, setSelectedRefId] = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+
+  // Cloud Sync
+  const [user, setUser] = useState(null);
+  const [dbSynced, setDbSynced] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const getPublicUrl = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        try {
+          if (window.top && window.top.location && window.top.location.href) {
+            const u = window.top.location.href;
+            if (u && !u.startsWith('about:') && !u.startsWith('blob:') && !u.includes('srcdoc')) {
+              return u;
+            }
+          }
+        } catch (e) {}
+
+        if (window.location && window.location.href) {
+          const u = window.location.href;
+          if (u && !u.startsWith('about:') && !u.startsWith('blob:') && !u.includes('srcdoc')) {
+            return u;
+          }
+        }
+
+        if (document.referrer) {
+          const u = document.referrer;
+          if (u && !u.startsWith('about:') && !u.startsWith('blob:') && !u.includes('srcdoc')) {
+            return u;
+          }
+        }
+      }
+    } catch (e) {}
+    return typeof window !== 'undefined' ? window.location.href : '';
+  };
+
+  const [shareUrl, setShareUrl] = useState(getPublicUrl);
+
+  const openShareModal = () => {
+    const currentUrl = getPublicUrl();
+    if (currentUrl) setShareUrl(currentUrl);
+    setShowShareModal(true);
+  };
+
+  // Confirm Modal
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', action: null });
+
+  // Teams Edit / Add
+  const [editingTeamId, setEditingTeamId] = useState(null);
+  const [editNumber, setEditNumber] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editP1, setEditP1] = useState('');
+  const [editP2, setEditP2] = useState('');
+  const [editPin, setEditPin] = useState('');
+  const [editCustomPoints, setEditCustomPoints] = useState(0);
+  const [editAssignedRefId, setEditAssignedRefId] = useState('');
+
+  // New team entry
+  const [newTeamNumber, setNewTeamNumber] = useState('');
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamP1, setNewTeamP1] = useState('');
+  const [newTeamP2, setNewTeamP2] = useState('');
+  const [newTeamPin, setNewTeamPin] = useState('');
+
+  // Referees
+  const [newRefName, setNewRefName] = useState('');
+  const [newRefPin, setNewRefPin] = useState('');
+
+  // Admin PIN change
+  const [newAdminPinInput, setNewAdminPinInput] = useState('');
+
+  // Penalties
+  const [penaltyTeamId, setPenaltyTeamId] = useState('');
+  const [penaltyPoints, setPenaltyPoints] = useState(5);
+  const [penaltyText, setPenaltyText] = useState('');
+
+  // Stopwatch
+  const [time, setTime] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const timerRef = useRef(null);
+  const [selectedTimerTeam, setSelectedTimerTeam] = useState('');
+  const [selectedTimerDriver, setSelectedTimerDriver] = useState('p1');
+
+  useEffect(() => {
+    if (teams.length > 0 && !selectedTimerTeam) {
+      setSelectedTimerTeam(teams[0].id);
+    }
+  }, [teams, selectedTimerTeam]);
+
+  useEffect(() => {
+    if (!hasFirebase) {
+      setDbSynced(false);
+      return;
+    }
+
+    const initAuthAndSync = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth Fallback Error:", err);
+      }
+    };
+
+    initAuthAndSync();
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!hasFirebase || !user) return;
+
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'raceState', 'main');
+
+    const unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.teams) setTeams(data.teams);
+        if (data.bracket) setBracket(data.bracket);
+        if (data.referees) setReferees(data.referees);
+        if (data.adminPin) setAdminPin(data.adminPin);
+        if (typeof data.isRaceReleased === 'boolean') setIsRaceReleased(data.isRaceReleased);
+      } else {
+        const freshBracket = generateInitialBracket(initialTeams);
+        setDoc(docRef, {
+          teams: initialTeams,
+          bracket: freshBracket,
+          referees: initialReferees,
+          adminPin: '24977',
+          isRaceReleased: false
+        }).catch(err => console.error("Error creating initial Cloud db:", err));
+      }
+      setDbSynced(true);
+    }, (error) => {
+      console.error("Firestore sync error:", error);
+      setDbSynced(false);
+    });
+
+    return () => unsubscribeSnapshot();
+  }, [user]);
+
+  const saveToCloud = async (newTeams, newBracket = null, newReferees = null, newAdminPin = null, newReleased = null) => {
+    if (newTeams) setTeams(newTeams);
+    if (newBracket) setBracket(newBracket);
+    if (newReferees) setReferees(newReferees);
+    if (newAdminPin) setAdminPin(newAdminPin);
+    if (typeof newReleased === 'boolean') setIsRaceReleased(newReleased);
+
+    if (hasFirebase && user) {
+      try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'raceState', 'main');
+        const updateData = {};
+        if (newTeams) updateData.teams = newTeams;
+        if (newBracket) updateData.bracket = newBracket;
+        if (newReferees) updateData.referees = newReferees;
+        if (newAdminPin) updateData.adminPin = newAdminPin;
+        if (typeof newReleased === 'boolean') updateData.isRaceReleased = newReleased;
+        await setDoc(docRef, updateData, { merge: true });
+      } catch (err) {
+        console.error("Cloud save error:", err);
+      }
+    }
+  };
+
+  const canEditTeam = (team) => {
+    if (!team) return false;
+    if (role === 'admin') return true;
+    if (role === 'referee' && activeRefId) {
+      return team.assignedRefId === activeRefId;
+    }
+    return false;
+  };
+
+  const activeRefObj = useMemo(() => {
+    return referees.find(r => r.id === activeRefId);
+  }, [referees, activeRefId]);
+
+  const activeTeamObj = useMemo(() => {
+    return teams.find(t => t.id === activeTeamId);
+  }, [teams, activeTeamId]);
+
+  useEffect(() => {
+    if (isRunning) {
+      const startTime = Date.now() - time;
+      timerRef.current = setInterval(() => {
+        setTime(Date.now() - startTime);
+      }, 10);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [isRunning]);
+
+  const handleStartPause = () => setIsRunning(!isRunning);
+  const handleReset = () => {
+    setIsRunning(false);
+    setTime(0);
+  };
+
+  const formatTime = (timeInMs) => {
+    const minutes = Math.floor(timeInMs / 60000);
+    const seconds = Math.floor((timeInMs % 60000) / 1000);
+    const centiseconds = Math.floor((timeInMs % 1000) / 10);
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+  };
+
+  const getRingPoints = (team) => {
+    const hitsCount = team.ringHits ? team.ringHits.filter(Boolean).length : 0;
+    return hitsCount * 5;
+  };
+
+  const getLapTimesRankings = () => {
+    const teamsWithTimes = teams
+      .filter(t => t.t1 > 0 && t.t2 > 0)
+      .map(t => ({
+        id: t.id,
+        totalTime: t.t1 + t.t2
+      }))
+      .sort((a, b) => a.totalTime - b.totalTime);
+
+    const rankings = {};
+    teamsWithTimes.forEach((item, index) => {
+      if (index === 0) rankings[item.id] = 30;
+      else if (index === 1) rankings[item.id] = 20;
+      else if (index === 2) rankings[item.id] = 10;
+      else rankings[item.id] = 0;
+    });
+    return rankings;
+  };
+
+  const activeBracketState = useMemo(() => {
+    return bracket ? computeTournamentTree(bracket) : null;
+  }, [bracket]);
+
+  const getCatchMePoints = (teamId) => {
+    if (!activeBracketState || !activeBracketState.r4) return 0;
+    const finalMatch = activeBracketState.r4.finale;
+    const p3Match = activeBracketState.r4.platz3;
+
+    if (finalMatch.winner === teamId) return 30;
+
+    const finalLoser = finalMatch.winner ? (finalMatch.winner === finalMatch.t1 ? finalMatch.t2 : finalMatch.t1) : '';
+    if (finalLoser === teamId) return 20;
+
+    if (p3Match.winner === teamId) return 10;
+
+    return 0;
+  };
+
+  const getRacePoints = (team) => {
+    if (!isRaceReleased && role !== 'admin') return 0;
+    const totalLaps = (team.race1Laps || 0) + (team.race2Laps || 0) + (team.race3Laps || 0);
+    return totalLaps * 5;
+  };
+
+  const calculateTotalPoints = (team, lapRankings) => {
+    const ring = getRingPoints(team);
+    const lapBonus = lapRankings[team.id] || 0;
+    const catchMe = getCatchMePoints(team.id);
+    const racePoints = getRacePoints(team);
+    const custom = team.customPoints || 0;
+    const penalties = team.penalties || 0;
+    return ring + lapBonus + catchMe + racePoints + custom - penalties;
+  };
+
+  const getLeaderboard = () => {
+    const lapRankings = getLapTimesRankings();
+    return [...teams]
+      .map(t => ({
+        ...t,
+        totalPoints: calculateTotalPoints(t, lapRankings),
+        ringPoints: getRingPoints(t),
+        lapPoints: lapRankings[t.id] || 0,
+        catchMePoints: getCatchMePoints(t.id),
+        racePoints: getRacePoints(t)
+      }))
+      .sort((a, b) => b.totalPoints - a.totalPoints);
+  };
+
+  const getBesteRundeLeaderboard = () => {
+    const list = [...teams];
+    if (bestLapSortMode === 'number') {
+      return list.sort((a, b) => (parseInt(a.number) || 0) - (parseInt(b.number) || 0));
+    }
+    return list.sort((a, b) => {
+      const aHasTimes = a.t1 > 0 && a.t2 > 0;
+      const bHasTimes = b.t1 > 0 && b.t2 > 0;
+      if (aHasTimes && !bHasTimes) return -1;
+      if (!aHasTimes && bHasTimes) return 1;
+      if (!aHasTimes && !bHasTimes) return 0;
+      return (a.t1 + a.t2) - (b.t1 + b.t2);
+    });
+  };
+
+  const canEditMatch = (match) => {
+    if (!match) return false;
+    if (role === 'admin') return true;
+    if (role === 'referee' && activeRefId) {
+      const t1Obj = teams.find(t => t.id === match.t1);
+      const t2Obj = teams.find(t => t.id === match.t2);
+      return (t1Obj && t1Obj.assignedRefId === activeRefId) || (t2Obj && t2Obj.assignedRefId === activeRefId);
+    }
+    return false;
+  };
+
+  const toggleRingHit = (teamId, attemptIndex) => {
+    const team = teams.find(t => t.id === teamId);
+    if (!team || !canEditTeam(team)) return;
+
+    const newTeams = teams.map(t => {
+      if (t.id === teamId) {
+        const newHits = [...(t.ringHits || [false, false, false, false, false])];
+        newHits[attemptIndex] = !newHits[attemptIndex];
+        return { ...t, ringHits: newHits };
+      }
+      return t;
+    });
+    saveToCloud(newTeams);
+  };
+
+  const saveDriverTime = (teamId, driverKey, seconds) => {
+    const team = teams.find(t => t.id === teamId);
+    if (!team || !canEditTeam(team)) return;
+
+    const newTeams = teams.map(t => {
+      if (t.id === teamId) {
+        return { ...t, [driverKey]: parseFloat(seconds) || 0 };
+      }
+      return t;
+    });
+    saveToCloud(newTeams);
+  };
+
+  const applyTimerTimeToTeam = () => {
+    const team = teams.find(t => t.id === selectedTimerTeam);
+    if (!team || !canEditTeam(team)) return;
+    const seconds = (time / 1000).toFixed(2);
+    saveDriverTime(selectedTimerTeam, selectedTimerDriver, seconds);
+    handleReset();
+  };
+
+  const handleApplyPenalty = (e) => {
+    e.preventDefault();
+    if (role !== 'admin' || !penaltyTeamId) return;
+    const newTeams = teams.map(t => {
+      if (t.id === penaltyTeamId) {
+        return {
+          ...t,
+          penalties: (t.penalties || 0) + parseInt(penaltyPoints),
+          penaltyReason: penaltyText ? `${penaltyText} (-${penaltyPoints} Pkt)` : `Unfaire Fahrweise (-${penaltyPoints} Pkt)`
+        };
+      }
+      return t;
+    });
+    saveToCloud(newTeams);
+    setPenaltyText('');
+    setPenaltyTeamId('');
+  };
+
+  const handleAddTeam = (e) => {
+    e.preventDefault();
+    if (role !== 'admin') return;
+    if (!newTeamName.trim()) return;
+
+    const nextNum = (teams.length + 1).toString();
+    const newTeam = {
+      id: Date.now().toString(),
+      number: newTeamNumber.trim() || nextNum,
+      name: newTeamName.trim(),
+      p1: newTeamP1.trim() || 'Fahrer 1',
+      p2: newTeamP2.trim() || 'Fahrer 2',
+      pin: newTeamPin.trim() || '1234',
+      ringHits: [false, false, false, false, false],
+      t1: 0,
+      t2: 0,
+      race1Laps: 0,
+      race2Laps: 0,
+      race3Laps: 0,
+      penalties: 0,
+      penaltyReason: '',
+      customPoints: 0,
+      assignedRefId: ''
+    };
+
+    const updatedTeams = [...teams, newTeam];
+    const updatedBracket = generateInitialBracket(updatedTeams);
+    saveToCloud(updatedTeams, updatedBracket);
+
+    setNewTeamNumber('');
+    setNewTeamName('');
+    setNewTeamP1('');
+    setNewTeamP2('');
+    setNewTeamPin('');
+  };
+
+  const handleAddReferee = (e) => {
+    e.preventDefault();
+    if (role !== 'admin' || !newRefName.trim() || !newRefPin.trim()) return;
+
+    const newRef = {
+      id: `ref_${Date.now()}`,
+      name: newRefName.trim(),
+      pin: newRefPin.trim()
+    };
+
+    const updatedReferees = [...referees, newRef];
+    saveToCloud(null, null, updatedReferees);
+
+    setNewRefName('');
+    setNewRefPin('');
+  };
+
+  const handleDeleteReferee = (refId, refName) => {
+    if (role !== 'admin') return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Schiedsrichter löschen?',
+      message: `Möchtest du den Schiedsrichter "${refName}" wirklich löschen? Die Zuweisungen der Teams bleiben leer.`,
+      action: () => {
+        const updatedReferees = referees.filter(r => r.id !== refId);
+        const updatedTeams = teams.map(t => {
+          if (t.assignedRefId === refId) {
+            return { ...t, assignedRefId: '' };
+          }
+          return t;
+        });
+        saveToCloud(updatedTeams, null, updatedReferees);
+        setConfirmModal({ isOpen: false, title: '', message: '', action: null });
+      }
+    });
+  };
+
+  const handleUpdateAdminPin = (e) => {
+    e.preventDefault();
+    if (role !== 'admin' || !newAdminPinInput.trim()) return;
+    saveToCloud(null, null, null, newAdminPinInput.trim());
+    setNewAdminPinInput('');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Erfolg!',
+      message: `Das Passwort für die Rennleitung wurde erfolgreich geändert.`,
+      action: () => setConfirmModal({ isOpen: false, title: '', message: '', action: null })
+    });
+  };
+
+  const triggerDeleteTeam = (teamId, teamName) => {
+    if (role !== 'admin') return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Team löschen?',
+      message: `Möchtest du das Team "${teamName}" wirklich aus dem Koppelrennen entfernen? Dadurch wird auch der K.O.-Baum neu generiert!`,
+      action: () => {
+        const updatedTeams = teams.filter(t => t.id !== teamId);
+        const updatedBracket = generateInitialBracket(updatedTeams);
+        saveToCloud(updatedTeams, updatedBracket);
+        setConfirmModal({ isOpen: false, title: '', message: '', action: null });
+      }
+    });
+  };
+
+  const saveTeamSetup = (e) => {
+    e.preventDefault();
+    if (role !== 'admin') return;
+    const newTeams = teams.map(t => {
+      if (t.id === editingTeamId) {
+        return { 
+          ...t, 
+          number: editNumber.trim() || t.number,
+          name: editName, 
+          p1: editP1, 
+          p2: editP2,
+          pin: editPin.trim() || t.pin,
+          customPoints: parseInt(editCustomPoints) || 0,
+          assignedRefId: editAssignedRefId
+        };
+      }
+      return t;
+    });
+    saveToCloud(newTeams);
+    setEditingTeamId(null);
+  };
+
+  const startEditingTeam = (team) => {
+    if (role !== 'admin') return;
+    setEditingTeamId(team.id);
+    setEditNumber(team.number || '');
+    setEditName(team.name);
+    setEditP1(team.p1);
+    setEditP2(team.p2);
+    setEditPin(team.pin || '1234');
+    setEditCustomPoints(team.customPoints || 0);
+    setEditAssignedRefId(team.assignedRefId || '');
+  };
+
+  const updateRaceLaps = (teamId, raceKey, delta) => {
+    const team = teams.find(t => t.id === teamId);
+    if (!team || !canEditTeam(team)) return;
+
+    const newTeams = teams.map(t => {
+      if (t.id === teamId) {
+        const currentLaps = t[raceKey] || 0;
+        return { ...t, [raceKey]: Math.max(0, currentLaps + delta) };
+      }
+      return t;
+    });
+    saveToCloud(newTeams);
+  };
+
+  const handleShuffleBracket = () => {
+    if (role !== 'admin') return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'K.O.-Baum neu auslosen?',
+      message: 'Möchtest du die Duelle für Catch Me If You Can wirklich zufällig neu auslosen? Alle bisherigen Siege in der Disziplin werden zurückgesetzt!',
+      action: () => {
+        const updatedBracket = generateInitialBracket(teams);
+        saveToCloud(teams, updatedBracket);
+        setActiveCatchMeRound('r1');
+        setConfirmModal({ isOpen: false, title: '', message: '', action: null });
+      }
+    });
+  };
+
+  const handleSetWinner = (roundKey, matchIndex, winnerId) => {
+    if (role !== 'admin') return;
+    let updated = JSON.parse(JSON.stringify(bracket));
+
+    if (roundKey === 'r1') updated.r1[matchIndex].winner = winnerId;
+    else if (roundKey === 'r2') updated.r2[matchIndex].winner = winnerId;
+    else if (roundKey === 'r3') updated.r3[matchIndex].winner = winnerId;
+    else if (roundKey === 'finale') updated.r4.finale.winner = winnerId;
+    else if (roundKey === 'platz3') updated.r4.platz3.winner = winnerId;
+
+    const computed = computeTournamentTree(updated);
+    saveToCloud(null, computed);
+  };
+
+  const handleResetEverything = () => {
+    if (role !== 'admin') return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Gesamtes Rennen zurücksetzen?',
+      message: 'Möchtest du wirklich alle aufgezeichneten Rundenzeiten, Ringtreffer und K.O.-Ergebnisse unwiderruflich löschen?',
+      action: () => {
+        const resetTeams = teams.map(t => ({
+          ...t,
+          ringHits: [false, false, false, false, false],
+          t1: 0,
+          t2: 0,
+          race1Laps: 0,
+          race2Laps: 0,
+          race3Laps: 0,
+          penalties: 0,
+          penaltyReason: '',
+          customPoints: 0
+        }));
+        const freshBracket = generateInitialBracket(resetTeams);
+        saveToCloud(resetTeams, freshBracket, null, null, false);
+        setConfirmModal({ isOpen: false, title: '', message: '', action: null });
+      }
+    });
+  };
+
+  const copyShareLink = () => {
+    const urlToCopy = shareUrl || getPublicUrl() || window.location.href;
+    const textarea = document.createElement('textarea');
+    textarea.value = urlToCopy;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  const handleLoginSubmit = (e) => {
+    e.preventDefault();
+    if (loginType === 'admin') {
+      if (pinInput === adminPin) {
+        setRole('admin');
+        setActiveRefId('');
+        setActiveTeamId('');
+        setShowPinModal(false);
+        setPinInput('');
+        setPinError(false);
+      } else {
+        setPinError(true);
+      }
+    } else if (loginType === 'referee') {
+      const matchedRef = referees.find(r => r.id === selectedRefId);
+      if (matchedRef && pinInput === matchedRef.pin) {
+        setRole('referee');
+        setActiveRefId(matchedRef.id);
+        setActiveTeamId('');
+        setShowPinModal(false);
+        setPinInput('');
+        setPinError(false);
+      } else {
+        setPinError(true);
+      }
+    } else if (loginType === 'team') {
+      const matchedTeam = teams.find(t => t.id === selectedTeamId);
+      if (matchedTeam && pinInput === (matchedTeam.pin || '1234')) {
+        setRole('team');
+        setActiveTeamId(matchedTeam.id);
+        setActiveRefId('');
+        setShowPinModal(false);
+        setPinInput('');
+        setPinError(false);
+      } else {
+        setPinError(true);
+      }
+    }
+  };
+
+  const getTeamName = (teamId) => {
+    const found = teams.find(t => t.id === teamId);
+    return found ? `#${found.number} ${found.name}` : 'Noch offen';
+  };
+
+  const getTeamDrivers = (teamId) => {
+    const found = teams.find(t => t.id === teamId);
+    return found ? `${found.p1} & ${found.p2}` : '';
+  };
+
+  const sortedLeaderboard = getLeaderboard();
+  const reverseGrid = [...sortedLeaderboard].reverse();
+
+  const catchMeTabs = useMemo(() => {
+    if (!bracket) return [];
+    const tabs = [];
+    if (bracket.totalRounds === 4) {
+      tabs.push({ id: 'r1', label: '1. Achtelfinale' });
+      tabs.push({ id: 'r2', label: '2. Viertelfinale' });
+      tabs.push({ id: 'r3', label: '3. Halbfinale' });
+      tabs.push({ id: 'r4', label: '4. Finals (Pl. 1-3)' });
+    } else if (bracket.totalRounds === 3) {
+      tabs.push({ id: 'r1', label: '1. Vorrunde (VF)' });
+      tabs.push({ id: 'r2', label: '2. Halbfinale' });
+      tabs.push({ id: 'r4', label: '3. Finals (Pl. 1-3)' });
+    } else if (bracket.totalRounds === 2) {
+      tabs.push({ id: 'r1', label: '1. Halbfinale' });
+      tabs.push({ id: 'r4', label: '2. Finals (Pl. 1-3)' });
+    }
+    return tabs;
+  }, [bracket]);
+
+  const firstPlaceTeam = activeBracketState?.r4?.finale?.winner ? getTeamName(activeBracketState.r4.finale.winner) : 'Noch offen';
+  const secondPlaceTeam = activeBracketState?.r4?.finale?.winner 
+    ? (activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t1 ? getTeamName(activeBracketState.r4.finale.t2) : getTeamName(activeBracketState.r4.finale.t1)) 
+    : 'Noch offen';
+  const thirdPlaceTeam = activeBracketState?.r4?.platz3?.winner ? getTeamName(activeBracketState.r4.platz3.winner) : 'Noch offen';
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans pb-16">
+      
+      {/* Role Banner */}
+      <div className={`w-full text-center py-2 px-4 transition duration-300 text-xs font-bold flex flex-wrap items-center justify-between gap-2 ${
+        role === 'admin' ? 'bg-amber-500 text-black' : role === 'referee' ? 'bg-emerald-500 text-black' : role === 'team' ? 'bg-blue-500 text-white' : 'bg-zinc-900 text-zinc-400 border-b border-zinc-800'
+      }`}>
+        <div className="flex items-center gap-2">
+          {role !== 'viewer' ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4 text-zinc-500" />}
+          <span>
+            {role === 'admin' ? (
+              'Rennleitung (Vollzugriff)'
+            ) : role === 'referee' ? (
+              `Schiedsrichter: ${activeRefObj?.name || 'Unbekannt'}`
+            ) : role === 'team' ? (
+              `Eingeloggt als: #${activeTeamObj?.number} ${activeTeamObj?.name}`
+            ) : (
+              'Zuschauer-Modus (Schreibgeschützt)'
+            )}
+          </span>
+        </div>
+        
+        {role !== 'viewer' ? (
+          <button 
+            onClick={() => {
+              setRole('viewer');
+              setActiveRefId('');
+              setActiveTeamId('');
+            }}
+            className="bg-black text-white hover:bg-zinc-900 px-3 py-1 rounded-full text-[10px] font-bold uppercase transition"
+          >
+            Ausloggen
+          </button>
+        ) : (
+          <button 
+            onClick={() => {
+              setLoginType('admin');
+              setPinInput('');
+              setPinError(false);
+              setShowPinModal(true);
+            }}
+            className="bg-amber-500 hover:bg-amber-600 text-black px-3 py-1 rounded-full text-[10px] font-bold uppercase transition"
+          >
+            Anmelden / Freischalten
+          </button>
+        )}
+      </div>
+
+      {/* Header */}
+      <header className="relative bg-black border-b border-zinc-800 overflow-hidden py-6 px-4 text-center">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <div className="relative max-w-2xl mx-auto">
+          <div className="flex justify-center items-center gap-2 mb-1">
+            <span className="text-2xl">🏁</span>
+            <span className="bg-amber-500 text-black text-xs font-black px-2.5 py-0.5 uppercase tracking-widest rounded">
+              Kattberger Koppelrennen 2026
+            </span>
+            <span className="text-2xl">🏁</span>
+          </div>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase text-zinc-100">
+            OFFIZIELLES LIVE-BOARD
+          </h1>
+          
+          <div className="flex flex-wrap justify-center items-center gap-3 mt-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-zinc-900 border border-zinc-850 rounded-full text-xs font-mono">
+              <span className={`h-2.5 w-2.5 rounded-full ${dbSynced ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+              <span>{dbSynced ? 'Live-Synchronisiert' : 'Lokaler Modus'}</span>
+            </div>
+
+            <button 
+              onClick={openShareModal}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-black rounded-full text-xs font-bold font-mono transition"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Handys koppeln
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* TABS */}
+      <div className="sticky top-0 z-30 bg-zinc-950 border-b border-zinc-800 p-2 shadow-md">
+        <div className="max-w-6xl mx-auto flex overflow-x-auto gap-1 scrollbar-none">
+          <button 
+            onClick={() => setActiveTab('leaderboard')}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+              activeTab === 'leaderboard' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:bg-zinc-900'
+            }`}
+          >
+            <Trophy className="w-4 h-4" /> Gesamtstand
+          </button>
+          <button 
+            onClick={() => setActiveTab('teams')}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+              activeTab === 'teams' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:bg-zinc-900'
+            }`}
+          >
+            <Users className="w-4 h-4" /> 👥 Teams ({teams.length})
+          </button>
+          <button 
+            onClick={() => setActiveTab('ringstechen')}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+              activeTab === 'ringstechen' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:bg-zinc-900'
+            }`}
+          >
+            🎯 1. Ringstechen
+          </button>
+          <button 
+            onClick={() => setActiveTab('schnellsteRunde')}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+              activeTab === 'schnellsteRunde' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:bg-zinc-900'
+            }`}
+          >
+            ⏱ 2. Beste Runde
+          </button>
+          <button 
+            onClick={() => setActiveTab('catchMe')}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+              activeTab === 'catchMe' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:bg-zinc-900'
+            }`}
+          >
+            ⚔ 3. Catch Me
+          </button>
+          <button 
+            onClick={() => setActiveTab('hauptrennen')}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+              activeTab === 'hauptrennen' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:bg-zinc-900'
+            }`}
+          >
+            🏁 4. Hauptrennen
+          </button>
+          <button 
+            onClick={() => setActiveTab('regeln')}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+              activeTab === 'regeln' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:bg-zinc-900'
+            }`}
+          >
+            📜 Regelwerk
+          </button>
+        </div>
+      </div>
+
+      <main className="max-w-6xl mx-auto px-4 mt-6">
+        
+        {/* ==================== TAB: GESAMTSTAND (LEADERBOARD) ==================== */}
+        {activeTab === 'leaderboard' && (
+          <div className="space-y-6">
+            
+            {/* Control Banner für Rennleitung */}
+            {role === 'admin' && (
+              <div className="bg-zinc-900 border border-amber-500/30 p-4 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-lg">
+                <div>
+                  <h3 className="font-black text-sm uppercase text-amber-400 flex items-center gap-2">
+                    <Shield className="w-4 h-4" /> Rennleitung Kontrolle: Hauptrennen
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {isRaceReleased 
+                      ? 'Status: Das Hauptrennen ist FREIGEGEBEN und für alle öffentlich sichtbar!' 
+                      : 'Status: Das Hauptrennen ist aktuell VERSTECKT. Zuschauer sehen nur den Zwischenstand (Disziplin 1–3).'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => saveToCloud(null, null, null, null, !isRaceReleased)}
+                  className={`px-4 py-2 rounded-lg text-xs font-extrabold uppercase tracking-wider transition ${
+                    isRaceReleased ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-amber-500 text-black hover:bg-amber-600 animate-pulse'
+                  }`}
+                >
+                  {isRaceReleased ? '🔒 Hauptrennen wieder verbergen' : '🏁 Hauptrennen JETZT freigeben'}
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-zinc-900/60 border border-zinc-800 p-4 rounded-xl flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-amber-500/10 text-amber-500">
+                  <Trophy className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block">Führendes Team</span>
+                  <span className="text-lg font-black text-zinc-100">
+                    {getLeaderboard()[0]?.name ? `#${getLeaderboard()[0].number} ${getLeaderboard()[0].name}` : 'Noch offen'}
+                  </span>
+                  <span className="text-xs text-zinc-400 block font-mono">
+                    {getLeaderboard()[0]?.totalPoints || 0} Gesamtpunkte
+                  </span>
+                </div>
+              </div>
+
+              {/* Strafen-Schnellzugriff */}
+              {role === 'admin' ? (
+                <div className="bg-zinc-900/60 border border-zinc-800 p-4 rounded-xl col-span-2">
+                  <h3 className="text-xs font-black uppercase text-red-500 mb-2 flex items-center gap-1">
+                    <ShieldAlert className="w-4 h-4" /> Unfairness & Regelverstoß (Punktabzug)
+                  </h3>
+                  <form onSubmit={handleApplyPenalty} className="flex flex-wrap gap-2">
+                    <select 
+                      value={penaltyTeamId} 
+                      onChange={(e) => setPenaltyTeamId(e.target.value)}
+                      className="flex-1 min-w-[150px] bg-zinc-950 border border-zinc-800 rounded p-1.5 text-xs text-zinc-300"
+                      required
+                    >
+                      <option value="">-- Team wählen --</option>
+                      {teams.map(t => (
+                        <option key={t.id} value={t.id}>#{t.number} {t.name}</option>
+                      ))}
+                    </select>
+                    <select 
+                      value={penaltyPoints} 
+                      onChange={(e) => setPenaltyPoints(e.target.value)}
+                      className="bg-zinc-950 border border-zinc-800 rounded p-1.5 text-xs text-zinc-300 w-20"
+                    >
+                      <option value={5}>-5 Pkt</option>
+                      <option value={10}>-10 Pkt</option>
+                      <option value={15}>-15 Pkt</option>
+                      <option value={20}>-20 Pkt</option>
+                    </select>
+                    <input 
+                      type="text" 
+                      placeholder="Grund für Punktabzug" 
+                      value={penaltyText} 
+                      onChange={(e) => setPenaltyText(e.target.value)}
+                      className="flex-1 min-w-[180px] bg-zinc-950 border border-zinc-800 rounded p-1.5 text-xs text-zinc-300"
+                    />
+                    <button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3 py-1.5 rounded transition">
+                      Bestrafen
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <div className="bg-zinc-900/40 border border-zinc-850 p-4 rounded-xl col-span-2 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase block">Rolle</span>
+                    <span className="text-sm text-zinc-300 font-semibold block">
+                      {role === 'referee' 
+                        ? `Schiedsrichter: ${activeRefObj?.name}. Du wertest zugewiesene Teams.` 
+                        : role === 'team'
+                        ? `Team #${activeTeamObj?.number} ${activeTeamObj?.name}`
+                        : 'Sie sehen die Live-Ergebnisse schreibgeschützt.'}
+                    </span>
+                  </div>
+                  {role === 'viewer' && (
+                    <button 
+                      onClick={() => {
+                        setLoginType('team');
+                        if (teams.length > 0) setSelectedTeamId(teams[0].id);
+                        setPinInput('');
+                        setPinError(false);
+                        setShowPinModal(true);
+                      }}
+                      className="border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 px-3 py-2 rounded text-xs font-bold font-mono transition"
+                    >
+                      Team Login
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Die große Gesamtpunktetabelle */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              <div className="p-4 bg-zinc-900/80 border-b border-zinc-800 flex justify-between items-center">
+                <h2 className="text-lg font-black uppercase text-amber-400">
+                  {isRaceReleased || role === 'admin' ? 'Aktueller Gesamtstand' : 'Zwischenstand (Disziplin 1–3)'}
+                </h2>
+                {role === 'admin' && (
+                  <button 
+                    onClick={handleResetEverything}
+                    className="bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-900/30 font-bold font-mono text-[10px] px-3 py-1 rounded transition"
+                  >
+                    Alles zurücksetzen
+                  </button>
+                )}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-zinc-950 text-[10px] uppercase text-zinc-400 tracking-wider border-b border-zinc-800">
+                      <th className="p-3 text-center w-12">Pos</th>
+                      <th className="p-3">Team (Fahrer 1 / Fahrer 2)</th>
+                      <th className="p-3 text-center">🎯 Ringe</th>
+                      <th className="p-3 text-center">⏱ Runde</th>
+                      <th className="p-3 text-center">⚔ Catch Me</th>
+                      <th className="p-3 text-center">
+                        {isRaceReleased || role === 'admin' ? '🚗 Hauptrennen' : '🚗 Hauptrennen 🔒'}
+                      </th>
+                      <th className="p-3 text-center text-amber-500">⚒ Anpass.</th>
+                      <th className="p-3 text-center text-red-400">⚠ Strafen</th>
+                      <th className="p-3 text-center font-bold text-amber-400 bg-amber-500/5">Punkte</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-850">
+                    {sortedLeaderboard.map((team, idx) => (
+                      <tr key={team.id} className="hover:bg-zinc-900/40 transition">
+                        <td className="p-3 text-center font-mono font-bold text-sm">
+                          {idx === 0 ? <span className="text-xl">🥇</span> : 
+                           idx === 1 ? <span className="text-xl">🥈</span> : 
+                           idx === 2 ? <span className="text-xl">🥉</span> : `#${idx + 1}`}
+                        </td>
+                        <td className="p-3">
+                          <div>
+                            <span className="font-extrabold text-zinc-200 block text-sm">
+                              #{team.number} {team.name}
+                            </span>
+                            <span className="text-xs text-zinc-500 flex items-center gap-1">
+                              <User className="w-3.5 h-3.5" /> {team.p1} & {team.p2}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-center font-mono text-xs">{team.ringPoints}</td>
+                        <td className="p-3 text-center font-mono text-xs">{team.lapPoints}</td>
+                        <td className="p-3 text-center font-mono text-xs">{team.catchMePoints}</td>
+                        <td className="p-3 text-center font-mono text-xs">
+                          {isRaceReleased || role === 'admin' ? (
+                            team.racePoints
+                          ) : (
+                            <span className="text-zinc-600 font-mono">🔒</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center font-mono text-xs text-amber-500">
+                          {team.customPoints > 0 ? `+${team.customPoints}` : team.customPoints < 0 ? team.customPoints : '0'}
+                        </td>
+                        <td className="p-3 text-center font-mono text-xs text-red-400">
+                          {team.penalties > 0 ? (
+                            <span title={team.penaltyReason} className="cursor-help underline decoration-dotted text-red-400">
+                              -{team.penalties}
+                            </span>
+                          ) : '0'}
+                        </td>
+                        <td className="p-3 text-center font-mono font-black text-base text-amber-400 bg-amber-500/5">
+                          {team.totalPoints}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB: TEAMS ==================== */}
+        {activeTab === 'teams' && (
+          <div className="space-y-8">
+            <div className="border-b border-zinc-800 pb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div>
+                <h2 className="text-xl font-extrabold uppercase text-amber-400">👥 Variable Teams & Zuweisung</h2>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Tragt Teams ein, ordnet Startnummern und Passwörter zu.
+                </p>
+              </div>
+              {role !== 'admin' && (
+                <span className="text-xs text-zinc-500 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg">
+                  Schreibgeschützt für Zuschauer, Teams & Schiris
+                </span>
+              )}
+            </div>
+
+            {role === 'admin' && (
+              <form onSubmit={handleAddTeam} className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
+                <h3 className="font-extrabold text-xs uppercase text-amber-400 flex items-center gap-1.5">
+                  <Plus className="w-4 h-4" /> Neues Team hinzufügen
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                  <input 
+                    type="text" 
+                    placeholder="Start-Nr."
+                    value={newTeamNumber}
+                    onChange={(e) => setNewTeamNumber(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-100 placeholder-zinc-700 font-mono"
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Teamname"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-100 placeholder-zinc-700 sm:col-span-2"
+                    required
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Fahrer 1"
+                    value={newTeamP1}
+                    onChange={(e) => setNewTeamP1(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-100 placeholder-zinc-700"
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Fahrer 2"
+                    value={newTeamP2}
+                    onChange={(e) => setNewTeamP2(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-100 placeholder-zinc-700"
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs py-2 rounded transition uppercase tracking-wider"
+                >
+                  Neues Team registrieren
+                </button>
+              </form>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teams.map((team) => {
+                const isMyRefTeam = role === 'referee' && team.assignedRefId === activeRefId;
+                const isMyOwnTeam = role === 'team' && team.id === activeTeamId;
+
+                return (
+                  <div key={team.id} className={`border p-4 rounded-xl space-y-3 relative overflow-hidden transition duration-300 ${
+                    isMyRefTeam ? 'border-emerald-500 bg-emerald-950/20' : isMyOwnTeam ? 'border-blue-500 bg-blue-950/20' : 'border-zinc-800 bg-zinc-900/40'
+                  }`}>
+                    <div className="absolute top-0 right-0 bg-zinc-950 text-amber-400 font-mono text-[10px] font-black px-2.5 py-0.5 rounded-bl border-l border-b border-zinc-850">
+                      #{team.number}
+                    </div>
+                    
+                    {editingTeamId === team.id ? (
+                      <form onSubmit={saveTeamSetup} className="space-y-2.5 pt-1">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Start-Nr.</label>
+                            <input 
+                              type="text" 
+                              value={editNumber} 
+                              onChange={(e) => setEditNumber(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-800 p-1.5 rounded text-xs text-zinc-100 font-mono mt-0.5"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Teamname</label>
+                            <input 
+                              type="text" 
+                              value={editName} 
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-800 p-1.5 rounded text-xs text-zinc-100 mt-0.5"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Fahrer 1</label>
+                            <input 
+                              type="text" 
+                              value={editP1} 
+                              onChange={(e) => setEditP1(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-800 p-1.5 rounded text-xs text-zinc-100 mt-0.5"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Fahrer 2</label>
+                            <input 
+                              type="text" 
+                              value={editP2} 
+                              onChange={(e) => setEditP2(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-800 p-1.5 rounded text-xs text-zinc-100 mt-0.5"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Team PIN</label>
+                            <input 
+                              type="text" 
+                              value={editPin} 
+                              onChange={(e) => setEditPin(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-800 p-1.5 rounded text-xs text-amber-400 font-mono mt-0.5"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Punkte (+/-)</label>
+                            <input 
+                              type="number" 
+                              value={editCustomPoints} 
+                              onChange={(e) => setEditCustomPoints(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-800 p-1.5 rounded text-xs text-zinc-100 mt-0.5"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-zinc-500">Schiedsrichter</label>
+                            <select 
+                              value={editAssignedRefId}
+                              onChange={(e) => setEditAssignedRefId(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-800 p-1.5 rounded text-xs text-zinc-100 mt-0.5"
+                            >
+                              <option value="">Keiner</option>
+                              {referees.map(r => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5 pt-1.5">
+                          <button 
+                            type="button" 
+                            onClick={() => setEditingTeamId(null)}
+                            className="flex-1 py-1 px-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-bold"
+                          >
+                            Abbrechen
+                          </button>
+                          <button 
+                            type="submit" 
+                            className="flex-1 py-1 px-2.5 bg-amber-500 hover:bg-amber-600 text-black rounded text-xs font-bold transition flex items-center justify-center gap-1"
+                          >
+                            <Save className="w-3.5 h-3.5" /> Speichern
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="pt-2">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="font-extrabold text-sm text-zinc-100 truncate">
+                            #{team.number} {team.name}
+                          </h3>
+                          {isMyRefTeam && (
+                            <span className="bg-emerald-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded uppercase">
+                              👮 Dein Team
+                            </span>
+                          )}
+                          {isMyOwnTeam && (
+                            <span className="bg-blue-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded uppercase">
+                              ★ Dein Account
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-zinc-400 space-y-0.5">
+                          <p className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-zinc-600 font-mono" /> F1: <strong className="text-zinc-300">{team.p1}</strong>
+                          </p>
+                          <p className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-zinc-600 font-mono" /> F2: <strong className="text-zinc-300">{team.p2}</strong>
+                          </p>
+                          {role === 'admin' && (
+                            <p className="text-amber-500 text-[11px] font-mono">
+                              Passwort / PIN: <strong>{team.pin || '1234'}</strong>
+                            </p>
+                          )}
+                        </div>
+                        
+                        {role === 'admin' && (
+                          <div className="mt-4 pt-2.5 border-t border-zinc-850 flex justify-between gap-2">
+                            <button 
+                              type="button"
+                              onClick={() => triggerDeleteTeam(team.id, team.name)}
+                              className="bg-zinc-950 hover:bg-red-950/20 border border-zinc-855 hover:border-red-900/40 text-zinc-500 hover:text-red-400 p-2 rounded text-xs transition"
+                              title="Team löschen"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => startEditingTeam(team)}
+                              className="flex-1 bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 text-zinc-300 px-3 py-1.5 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-amber-500" /> Bearbeiten & Zuweisen
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {role === 'admin' && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-6">
+                <div className="border-b border-zinc-850 pb-3">
+                  <h3 className="text-lg font-black uppercase text-amber-400 flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-amber-500" />
+                    Sicherheit & Rollen-Konfiguration
+                  </h3>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Verwalten Sie das Rennleitung-Passwort sowie Schiedsrichter.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-zinc-200 uppercase flex items-center gap-1">
+                      <Sliders className="w-4 h-4 text-zinc-400" />
+                      Schiedsrichter verwalten
+                    </h4>
+
+                    <form onSubmit={handleAddReferee} className="bg-zinc-950 p-4 rounded-xl border border-zinc-850 space-y-3">
+                      <span className="text-[10px] text-amber-400 uppercase font-bold">Neuen Schiri registrieren</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="Name"
+                          value={newRefName}
+                          onChange={(e) => setNewRefName(e.target.value)}
+                          className="bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-100 placeholder-zinc-700"
+                          required
+                        />
+                        <input 
+                          type="password" 
+                          placeholder="PIN"
+                          value={newRefPin}
+                          onChange={(e) => setNewRefPin(e.target.value)}
+                          className="bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-100 placeholder-zinc-700"
+                          required
+                        />
+                      </div>
+                      <button 
+                        type="submit"
+                        className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-xs font-bold text-zinc-200"
+                      >
+                        Schiedsrichter hinzufügen
+                      </button>
+                    </form>
+
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {referees.map(r => {
+                        const assignedCount = teams.filter(t => t.assignedRefId === r.id).length;
+                        return (
+                          <div key={r.id} className="bg-zinc-950 border border-zinc-850 p-3 rounded-lg flex items-center justify-between text-xs">
+                            <div>
+                              <span className="font-bold text-zinc-200 block">{r.name}</span>
+                              <span className="text-[10px] text-zinc-500 font-mono">
+                                PIN: <span className="font-bold text-amber-500">{r.pin}</span> · {assignedCount} Teams
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReferee(r.id, r.name)}
+                              className="text-zinc-600 hover:text-red-400 p-1.5 transition"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-zinc-200 uppercase flex items-center gap-1">
+                      <Key className="w-4 h-4 text-zinc-400" />
+                      Rennleitung Master PIN ändern
+                    </h4>
+                    
+                    <form onSubmit={handleUpdateAdminPin} className="bg-zinc-950 p-4 rounded-xl border border-zinc-850 space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-zinc-500">Neue Admin-PIN</label>
+                        <input 
+                          type="password" 
+                          placeholder="Zahlenfolge"
+                          value={newAdminPinInput}
+                          onChange={(e) => setNewAdminPinInput(e.target.value)}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-100 placeholder-zinc-700"
+                          required
+                        />
+                      </div>
+                      <button 
+                        type="submit"
+                        className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-black rounded text-xs font-bold transition uppercase tracking-wider"
+                      >
+                        PIN ändern & speichern
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TAB: 1. RINGSTECHEN ==================== */}
+        {activeTab === 'ringstechen' && (
+          <div className="space-y-4">
+            <div className="border-b border-zinc-800 pb-2">
+              <h2 className="text-xl font-extrabold uppercase text-amber-400">🎯 Disziplin 1: Ringstechen</h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Jedes Team hat **5 Versuche**. Jeder erfolgreiche Treffer bringt **5 Punkte**.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {teams
+                .filter(team => role !== 'team' || team.id === activeTeamId)
+                .map(team => {
+                  const hitsCount = team.ringHits ? team.ringHits.filter(Boolean).length : 0;
+                  const isEditable = canEditTeam(team);
+                  const isMyRefTeam = role === 'referee' && team.assignedRefId === activeRefId;
+
+                  return (
+                    <div key={team.id} className={`border p-4 rounded-xl flex items-center justify-between gap-4 transition duration-300 ${
+                      isMyRefTeam ? 'border-emerald-500 bg-emerald-950/20' : 'border-zinc-800 bg-zinc-900/40'
+                    }`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="font-extrabold text-zinc-100 text-sm truncate">
+                            #{team.number} {team.name}
+                          </span>
+                          {isMyRefTeam && (
+                            <span className="bg-emerald-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded uppercase">
+                              👮 Dein Team
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-zinc-500">Starter: {team.p1} & {team.p2}</span>
+                        <div className="text-xs text-amber-400 font-bold mt-1 font-mono">
+                          {hitsCount} Treffer = {hitsCount * 5} Punkte
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {(team.ringHits || [false, false, false, false, false]).map((hit, attemptIdx) => (
+                          <button
+                            key={attemptIdx}
+                            disabled={!isEditable}
+                            onClick={() => toggleRingHit(team.id, attemptIdx)}
+                            className={`w-9 h-9 rounded-lg font-black text-xs transition border flex items-center justify-center ${
+                              hit 
+                                ? 'bg-amber-500 border-amber-600 text-black font-extrabold' 
+                                : 'bg-zinc-950 border-zinc-800 text-zinc-600'
+                            } ${!isEditable ? 'cursor-default opacity-50' : 'hover:border-zinc-700'}`}
+                          >
+                            {hit ? '✔' : attemptIdx + 1}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB: 2. BESTE RUNDE (TIMING) ==================== */}
+        {activeTab === 'schnellsteRunde' && (
+          <div className="space-y-6">
+            <div className="border-b border-zinc-800 pb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div>
+                <h2 className="text-xl font-extrabold uppercase text-amber-400">⏱ Disziplin 2: Beste Runde</h2>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Die Rundenzeiten werden addiert. (1. Platz: 30 Pkt | 2. Platz: 20 Pkt | 3. Platz: 10 Pkt)
+                </p>
+              </div>
+
+              <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-lg text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setBestLapSortMode('number')}
+                  className={`px-3 py-1 rounded transition ${bestLapSortMode === 'number' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:text-zinc-200'}`}
+                >
+                  🔢 Startnr. (stabil)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBestLapSortMode('time')}
+                  className={`px-3 py-1 rounded transition ${bestLapSortMode === 'time' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:text-zinc-200'}`}
+                >
+                  🏆 Bestzeit
+                </button>
+              </div>
+            </div>
+
+            {role !== 'viewer' && role !== 'team' && teams.length > 0 && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 grid grid-cols-1 lg:grid-cols-3 gap-6 shadow-md">
+                <div className="lg:col-span-1 bg-zinc-950 border border-zinc-850 p-4 rounded-xl text-center space-y-4">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block tracking-wider">⏱ Koppel-Stoppuhr</span>
+                  <div className="font-mono text-4xl lg:text-5xl font-black text-zinc-100 py-4 tabular-nums">
+                    {formatTime(time)}
+                  </div>
+                  
+                  <div className="flex justify-center gap-2">
+                    <button 
+                      onClick={handleReset} 
+                      className="p-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 rounded-lg transition"
+                    >
+                      <RotateCcw className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={handleStartPause} 
+                      className={`flex-1 py-2 px-4 rounded-lg font-bold uppercase text-xs tracking-wider transition flex items-center justify-center gap-1.5 ${
+                        isRunning ? 'bg-red-500 text-white' : 'bg-emerald-500 text-black'
+                      }`}
+                    >
+                      {isRunning ? <><Pause className="w-4 h-4 fill-current" /> Stop</> : <><Play className="w-4 h-4 fill-current" /> Start</>}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2 flex flex-col justify-between space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">1. Team wählen</label>
+                      <select 
+                        value={selectedTimerTeam}
+                        onChange={(e) => setSelectedTimerTeam(e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm font-bold text-zinc-200"
+                      >
+                        <option value="">-- Bitte wählen --</option>
+                        {teams.map(t => (
+                          <option key={t.id} value={t.id}>#{t.number} {t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">2. Fahrer wählen</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          type="button" 
+                          onClick={() => setSelectedTimerDriver('p1')}
+                          className={`py-2 px-3 rounded text-xs font-bold transition border ${
+                            selectedTimerDriver === 'p1' ? 'bg-amber-500 text-black border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                          }`}
+                        >
+                          {teams.find(t => t.id === selectedTimerTeam)?.p1 || 'Fahrer 1'}
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => setSelectedTimerDriver('p2')}
+                          className={`py-2 px-3 rounded text-xs font-bold transition border ${
+                            selectedTimerDriver === 'p2' ? 'bg-amber-500 text-black border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                          }`}
+                        >
+                          {teams.find(t => t.id === selectedTimerTeam)?.p2 || 'Fahrer 2'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-zinc-950/60 p-3 rounded-lg border border-zinc-850">
+                    <div className="text-xs text-zinc-400">
+                      Ausgewählt: <span className="text-zinc-200 font-bold">{selectedTimerTeam ? getTeamName(selectedTimerTeam) : 'Keins'}</span> 
+                      - Fahrer: <span className="text-amber-400 font-bold">{selectedTimerDriver === 'p1' ? teams.find(t => t.id === selectedTimerTeam)?.p1 : teams.find(t => t.id === selectedTimerTeam)?.p2}</span>
+                    </div>
+                    <button
+                      onClick={applyTimerTimeToTeam}
+                      disabled={time === 0 || !selectedTimerTeam || !canEditTeam(teams.find(t => t.id === selectedTimerTeam))}
+                      className="bg-amber-500 hover:bg-amber-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-extrabold text-xs px-4 py-2 rounded uppercase transition"
+                    >
+                      Zeit eintragen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              <div className="p-4 bg-zinc-950 border-b border-zinc-850 flex justify-between items-center">
+                <span className="text-xs font-bold uppercase text-zinc-300">Rundenwertung</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-zinc-950 text-[10px] uppercase text-zinc-500 tracking-wider border-b border-zinc-800">
+                      <th className="p-3 text-center w-12">Pos</th>
+                      <th className="p-3">Team</th>
+                      <th className="p-3">Zeit Fahrer 1</th>
+                      <th className="p-3">Zeit Fahrer 2</th>
+                      <th className="p-3 text-center font-bold">Gesamtzeit</th>
+                      <th className="p-3 text-center text-amber-400 font-bold">Punkte</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-850">
+                    {getBesteRundeLeaderboard()
+                      .filter(team => role !== 'team' || team.id === activeTeamId)
+                      .map((team, idx) => {
+                        const total = team.t1 > 0 && team.t2 > 0 ? (team.t1 + team.t2).toFixed(2) : null;
+                        const bonus = getLapTimesRankings()[team.id] || 0;
+                        const isCompleted = team.t1 > 0 && team.t2 > 0;
+                        const isEditable = canEditTeam(team);
+
+                        return (
+                          <tr key={team.id} className={`transition ${
+                            isEditable ? 'bg-amber-500/5 hover:bg-amber-500/10' : 'hover:bg-zinc-900/40'
+                          }`}>
+                            <td className="p-3 text-center font-mono font-bold">
+                              {isCompleted ? (
+                                idx === 0 ? <span className="text-sm">🥇</span> : 
+                                idx === 1 ? <span className="text-sm">🥈</span> : 
+                                idx === 2 ? <span className="text-sm">🥉</span> : `#${idx + 1}`
+                              ) : (
+                                <span className="text-zinc-600">-</span>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              <div>
+                                <span className="font-bold text-zinc-200 block text-sm">
+                                  #{team.number} {team.name}
+                                </span>
+                                <span className="text-[10px] text-zinc-500">{team.p1} & {team.p2}</span>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              {isEditable ? (
+                                <input 
+                                  type="number" 
+                                  step="0.01" 
+                                  value={team.t1 || ''} 
+                                  onChange={(e) => saveDriverTime(team.id, 't1', e.target.value)}
+                                  placeholder="z.B. 42.15"
+                                  className="w-24 bg-zinc-950 border border-zinc-800 p-1 rounded font-mono text-zinc-300 text-center"
+                                />
+                              ) : (
+                                <span className="font-mono text-zinc-300">{team.t1 > 0 ? `${team.t1.toFixed(2)}s` : 'keine Zeit'}</span>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {isEditable ? (
+                                <input 
+                                  type="number" 
+                                  step="0.01" 
+                                  value={team.t2 || ''} 
+                                  onChange={(e) => saveDriverTime(team.id, 't2', e.target.value)}
+                                  placeholder="z.B. 45.30"
+                                  className="w-24 bg-zinc-950 border border-zinc-800 p-1 rounded font-mono text-zinc-300 text-center"
+                                />
+                              ) : (
+                                <span className="font-mono text-zinc-300">{team.t2 > 0 ? `${team.t2.toFixed(2)}s` : 'keine Zeit'}</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              {total ? (
+                                <span className="font-mono font-black text-xs text-zinc-100 bg-zinc-950 border border-zinc-850 px-2 py-0.5 rounded inline-block">
+                                  {total}s
+                                </span>
+                              ) : (
+                                <span className="text-zinc-600 font-mono italic">unvollständig</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              {bonus > 0 ? (
+                                <span className="bg-amber-500/10 text-amber-400 font-black px-2 py-1 rounded border border-amber-500/20">
+                                  +{bonus} Pkt
+                                </span>
+                              ) : (
+                                <span className="text-zinc-600">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB: 3. CATCH ME IF YOU CAN ==================== */}
+        {activeTab === 'catchMe' && (
+          <div className="space-y-6">
+            <div className="border-b border-zinc-800 pb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div>
+                <h2 className="text-xl font-extrabold uppercase text-amber-400">⚔ Disziplin 3: Catch Me If You Can</h2>
+                <p className="text-xs text-zinc-400 mt-1">
+                  K.O.-Turnierbaum für {teams.length} Teams. Markiert die Gewinner live!
+                </p>
+              </div>
+              {role === 'admin' && teams.length >= 4 && (
+                <button 
+                  type="button"
+                  onClick={handleShuffleBracket}
+                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-xs font-bold px-3 py-1.5 rounded transition flex items-center gap-1.5 shrink-0"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-500" /> K.O.-Baum auslosen & starten
+                </button>
+              )}
+            </div>
+
+            {teams.length < 4 ? (
+              <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl text-center space-y-3">
+                <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
+                <h3 className="font-extrabold text-sm uppercase text-zinc-200">Zu wenige Teams</h3>
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                  Ihr benötigt mindestens **4 registrierte Teams** im Tab "Teams", um einen gültigen K.O.-Turnierbaum zu starten.
+                </p>
+              </div>
+            ) : !activeBracketState ? (
+              <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl text-center space-y-3">
+                <RefreshCw className="w-10 h-10 text-amber-500 mx-auto animate-spin" />
+                <h3 className="font-extrabold text-sm uppercase text-zinc-200">K.O.-Baum generieren</h3>
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                  Rennleitung muss den K.O.-Baum oben auslosen und starten!
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 text-center">
+                  <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-widest block mb-1">🥇 1. Platz (30 Pkt)</span>
+                    <span className="font-extrabold text-sm text-zinc-100">{firstPlaceTeam}</span>
+                  </div>
+                  <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850">
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-widest block mb-1">🥈 2. Platz (20 Pkt)</span>
+                    <span className="font-extrabold text-sm text-zinc-100">{secondPlaceTeam}</span>
+                  </div>
+                  <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-850">
+                    <span className="text-xs font-bold text-amber-700 uppercase tracking-widest block mb-1">🥉 3. Platz (10 Pkt)</span>
+                    <span className="font-extrabold text-sm text-zinc-100">{thirdPlaceTeam}</span>
+                  </div>
+                </div>
+
+                <div className="flex overflow-x-auto gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-850">
+                  {catchMeTabs.map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveCatchMeRound(tab.id)}
+                      className={`flex-1 min-w-[110px] py-2 text-xs font-bold uppercase rounded transition ${
+                        activeCatchMeRound === tab.id ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:bg-zinc-900'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {activeCatchMeRound === 'r1' && (
+                  <div className="space-y-4">
+                    {activeBracketState.seeded?.length > 0 && (
+                      <div className="bg-zinc-900/60 p-3 rounded-lg border border-zinc-850 text-xs text-zinc-400">
+                        💡 **Regel-Info:** Einige Teams haben durch Freilos ein Ticket direkt in die nächste Runde gelöst:
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {activeBracketState.seeded.map(id => (
+                            <span key={id} className="p-1 px-2.5 bg-zinc-950 rounded border border-zinc-800 text-zinc-300 font-bold text-[11px]">
+                              ✈ {getTeamName(id)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {activeBracketState.r1?.map((match, idx) => {
+                        const canEdit = canEditMatch(match);
+                        return (
+                          <div key={match.id} className={`border rounded-xl p-4 space-y-3 transition ${
+                            canEdit ? 'border-amber-500 bg-zinc-900' : 'border-zinc-800 bg-zinc-900/40'
+                          }`}>
+                            <span className="text-[10px] bg-zinc-950 border border-zinc-850 text-zinc-500 px-2 py-0.5 rounded font-bold font-mono">
+                              DUELL #{idx + 1}
+                            </span>
+                            <div className="space-y-2">
+                              <button
+                                type="button"
+                                disabled={!canEdit || !match.t1}
+                                onClick={() => handleSetWinner('r1', idx, match.t1)}
+                                className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition ${
+                                  match.winner === match.t1 
+                                    ? 'bg-amber-500 border-amber-600 text-black font-extrabold' 
+                                    : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                                }`}
+                              >
+                                <div className="truncate">
+                                  <span className="block font-bold text-sm">{getTeamName(match.t1)}</span>
+                                  <span className="text-[10px] opacity-70">{getTeamDrivers(match.t1)}</span>
+                                </div>
+                                {match.winner === match.t1 && <span className="text-[10px] bg-black text-amber-400 px-2 py-0.5 rounded font-black">SIEG</span>}
+                              </button>
+
+                              <div className="text-center text-[10px] font-bold text-zinc-600">VS</div>
+
+                              <button
+                                type="button"
+                                disabled={!canEdit || !match.t2}
+                                onClick={() => handleSetWinner('r1', idx, match.t2)}
+                                className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition ${
+                                  match.winner === match.t2 
+                                    ? 'bg-amber-500 border-amber-600 text-black font-extrabold' 
+                                    : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                                }`}
+                              >
+                                <div className="truncate">
+                                  <span className="block font-bold text-sm">{getTeamName(match.t2)}</span>
+                                  <span className="text-[10px] opacity-70">{getTeamDrivers(match.t2)}</span>
+                                </div>
+                                {match.winner === match.t2 && <span className="text-[10px] bg-black text-amber-400 px-2 py-0.5 rounded font-black">SIEG</span>}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {activeCatchMeRound === 'r2' && activeBracketState.totalRounds >= 3 && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {activeBracketState.r2?.map((match, idx) => {
+                        const hasT1 = !!match.t1;
+                        const hasT2 = !!match.t2;
+                        const canEdit = canEditMatch(match);
+                        return (
+                          <div key={match.id} className={`border rounded-xl p-4 space-y-3 transition ${
+                            canEdit ? 'border-amber-500 bg-zinc-900' : 'border-zinc-800 bg-zinc-900/40'
+                          }`}>
+                            <span className="text-[10px] bg-zinc-950 border border-zinc-850 text-zinc-500 px-2 py-0.5 rounded font-bold font-mono">
+                              VIERTELFINALE - DUELL #{idx + 1}
+                            </span>
+                            <div className="space-y-2">
+                              <button
+                                type="button"
+                                disabled={!canEdit || !hasT1}
+                                onClick={() => handleSetWinner('r2', idx, match.t1)}
+                                className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition ${
+                                  !hasT1 ? 'border-dashed border-zinc-855 opacity-40 bg-zinc-950/20 text-zinc-650' :
+                                  match.winner === match.t1 
+                                    ? 'bg-amber-500 border-amber-600 text-black font-extrabold' 
+                                    : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                                }`}
+                              >
+                                {hasT1 ? (
+                                  <div className="truncate">
+                                    <span className="block font-bold text-sm">{getTeamName(match.t1)}</span>
+                                    <span className="text-[10px] opacity-70">{getTeamDrivers(match.t1)}</span>
+                                  </div>
+                                ) : (
+                                  <span className="italic text-xs py-1.5 block text-center">Wartet auf Gegner...</span>
+                                )}
+                                {match.winner === match.t1 && <span className="text-[10px] bg-black text-amber-400 px-2 py-0.5 rounded font-black">SIEG</span>}
+                              </button>
+
+                              <div className="text-center text-[10px] font-bold text-zinc-600">VS</div>
+
+                              <button
+                                type="button"
+                                disabled={!canEdit || !hasT2}
+                                onClick={() => handleSetWinner('r2', idx, match.t2)}
+                                className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition ${
+                                  !hasT2 ? 'border-dashed border-zinc-855 opacity-40 bg-zinc-950/20 text-zinc-650' :
+                                  match.winner === match.t2 
+                                    ? 'bg-amber-500 border-amber-600 text-black font-extrabold' 
+                                    : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                                }`}
+                              >
+                                {hasT2 ? (
+                                  <div className="truncate">
+                                    <span className="block font-bold text-sm">{getTeamName(match.t2)}</span>
+                                    <span className="text-[10px] opacity-70">{getTeamDrivers(match.t2)}</span>
+                                  </div>
+                                ) : (
+                                  <span className="italic text-xs py-1.5 block text-center">Wartet auf Gegner...</span>
+                                )}
+                                {match.winner === match.t2 && <span className="text-[10px] bg-black text-amber-400 px-2 py-0.5 rounded font-black">SIEG</span>}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {activeCatchMeRound === 'r3' && activeBracketState.totalRounds === 4 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {activeBracketState.r3?.map((match, idx) => {
+                      const hasT1 = !!match.t1;
+                      const hasT2 = !!match.t2;
+                      const canEdit = canEditMatch(match);
+                      return (
+                        <div key={match.id} className={`border rounded-xl p-4 space-y-3 transition ${
+                          canEdit ? 'border-amber-500 bg-zinc-900' : 'border-zinc-800 bg-zinc-900/40'
+                        }`}>
+                          <span className="text-[10px] bg-zinc-950 border border-zinc-850 text-zinc-500 px-2 py-0.5 rounded font-bold font-mono">
+                            HALBFINALE #{idx + 1}
+                          </span>
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              disabled={!canEdit || !hasT1}
+                              onClick={() => handleSetWinner('r3', idx, match.t1)}
+                              className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition ${
+                                !hasT1 ? 'border-dashed border-zinc-855 opacity-40 bg-zinc-950/20 text-zinc-650' :
+                                match.winner === match.t1 
+                                  ? 'bg-amber-500 border-amber-600 text-black font-extrabold' 
+                                  : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                              }`}
+                            >
+                              {hasT1 ? (
+                                <div className="truncate">
+                                  <span className="block font-bold text-sm">{getTeamName(match.t1)}</span>
+                                  <span className="text-[10px] opacity-70">{getTeamDrivers(match.t1)}</span>
+                                </div>
+                              ) : (
+                                <span className="italic text-xs py-1.5 block text-center">Wartet auf Gewinner...</span>
+                              )}
+                              {match.winner === match.t1 && <span className="text-[10px] bg-black text-amber-400 px-2 py-0.5 rounded font-black">SIEG</span>}
+                            </button>
+
+                            <div className="text-center text-[10px] font-bold text-zinc-600">VS</div>
+
+                            <button
+                              type="button"
+                              disabled={!canEdit || !hasT2}
+                              onClick={() => handleSetWinner('r3', idx, match.t2)}
+                              className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition ${
+                                !hasT2 ? 'border-dashed border-zinc-855 opacity-40 bg-zinc-950/20 text-zinc-650' :
+                                match.winner === match.t2 
+                                  ? 'bg-amber-500 border-amber-600 text-black font-extrabold' 
+                                  : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                              }`}
+                            >
+                              {hasT2 ? (
+                                <div className="truncate">
+                                  <span className="block font-bold text-sm">{getTeamName(match.t2)}</span>
+                                  <span className="text-[10px] opacity-70">{getTeamDrivers(match.t2)}</span>
+                                </div>
+                              ) : (
+                                <span className="italic text-xs py-1.5 block text-center">Wartet auf Gewinner...</span>
+                              )}
+                              {match.winner === match.t2 && <span className="text-[10px] bg-black text-amber-400 px-2 py-0.5 rounded font-black">SIEG</span>}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {activeCatchMeRound === 'r4' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {(() => {
+                      const canEditP3 = canEditMatch(activeBracketState.r4?.platz3);
+                      return (
+                        <div className={`border rounded-xl p-4 space-y-4 transition ${
+                          canEditP3 ? 'border-amber-500 bg-zinc-900' : 'border-zinc-800 bg-zinc-900/40'
+                        }`}>
+                          <div className="flex justify-between items-center border-b border-zinc-850 pb-2">
+                            <span className="text-xs font-black text-amber-700 uppercase tracking-widest block">🥉 Spiel um Platz 3</span>
+                            <span className="text-[9px] text-zinc-500 font-mono">Sieger erhält 10 Pkt</span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              disabled={!canEditP3 || !activeBracketState.r4?.platz3?.t1}
+                              onClick={() => handleSetWinner('platz3', 0, activeBracketState.r4.platz3.t1)}
+                              className={`w-full p-3 rounded-lg border text-left flex items-center justify-between transition ${
+                                !activeBracketState.r4?.platz3?.t1 ? 'border-dashed border-zinc-850 opacity-40 text-zinc-650' :
+                                activeBracketState.r4.platz3.winner === activeBracketState.r4.platz3.t1 
+                                  ? 'bg-amber-700 border-amber-800 text-white font-extrabold' 
+                                  : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                              }`}
+                            >
+                              <div className="truncate">
+                                <span className="block font-bold text-sm">{getTeamName(activeBracketState.r4.platz3.t1)}</span>
+                                <span className="text-[10px] opacity-70">{getTeamDrivers(activeBracketState.r4.platz3.t1)}</span>
+                              </div>
+                              {activeBracketState.r4.platz3.winner === activeBracketState.r4.platz3.t1 && <span className="text-[10px] bg-black text-amber-400 px-2.5 py-0.5 rounded">3. PLATZ</span>}
+                            </button>
+
+                            <div className="text-center text-[10px] font-bold text-zinc-600">VS</div>
+
+                            <button
+                              type="button"
+                              disabled={!canEditP3 || !activeBracketState.r4?.platz3?.t2}
+                              onClick={() => handleSetWinner('platz3', 0, activeBracketState.r4.platz3.t2)}
+                              className={`w-full p-3 rounded-lg border text-left flex items-center justify-between transition ${
+                                !activeBracketState.r4?.platz3?.t2 ? 'border-dashed border-zinc-850 opacity-40 text-zinc-650' :
+                                activeBracketState.r4.platz3.winner === activeBracketState.r4.platz3.t2 
+                                  ? 'bg-amber-700 border-amber-800 text-white font-extrabold' 
+                                  : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                              }`}
+                            >
+                              <div className="truncate">
+                                <span className="block font-bold text-sm">{getTeamName(activeBracketState.r4.platz3.t2)}</span>
+                                <span className="text-[10px] opacity-70">{getTeamDrivers(activeBracketState.r4.platz3.t2)}</span>
+                              </div>
+                              {activeBracketState.r4.platz3.winner === activeBracketState.r4.platz3.t2 && <span className="text-[10px] bg-black text-amber-400 px-2.5 py-0.5 rounded">3. PLATZ</span>}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {(() => {
+                      const canEditFinale = canEditMatch(activeBracketState.r4?.finale);
+                      return (
+                        <div className={`border rounded-xl p-4 space-y-4 transition ${
+                          canEditFinale ? 'border-amber-500 bg-zinc-900' : 'border-zinc-800 bg-zinc-900/40'
+                        }`}>
+                          <div className="flex justify-between items-center border-b border-zinc-850 pb-2">
+                            <span className="text-xs font-black text-amber-400 uppercase tracking-widest block">🥇 Das große Finale</span>
+                            <span className="text-[9px] text-zinc-500 font-mono">Sieger: 30 Pkt | 2. Platz: 20 Pkt</span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              disabled={!canEditFinale || !activeBracketState.r4?.finale?.t1}
+                              onClick={() => handleSetWinner('finale', 0, activeBracketState.r4.finale.t1)}
+                              className={`w-full p-3 rounded-lg border text-left flex items-center justify-between transition ${
+                                !activeBracketState.r4?.finale?.t1 ? 'border-dashed border-zinc-850 opacity-40 text-zinc-650' :
+                                activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t1 
+                                  ? 'bg-amber-500 border-amber-600 text-black font-extrabold shadow-lg shadow-amber-500/15' 
+                                  : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                              }`}
+                            >
+                              <div className="truncate">
+                                <span className="block font-bold text-sm">{getTeamName(activeBracketState.r4.finale.t1)}</span>
+                                <span className="text-[10px] opacity-70">{getTeamDrivers(activeBracketState.r4.finale.t1)}</span>
+                              </div>
+                              {activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t1 && <span className="text-[10px] bg-black text-amber-400 px-2.5 py-0.5 rounded">POKALSIEGER</span>}
+                            </button>
+
+                            <div className="text-center text-[10px] font-bold text-zinc-600">VS</div>
+
+                            <button
+                              type="button"
+                              disabled={!canEditFinale || !activeBracketState.r4?.finale?.t2}
+                              onClick={() => handleSetWinner('finale', 0, activeBracketState.r4.finale.t2)}
+                              className={`w-full p-3 rounded-lg border text-left flex items-center justify-between transition ${
+                                !activeBracketState.r4?.finale?.t2 ? 'border-dashed border-zinc-850 opacity-40 text-zinc-650' :
+                                activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t2 
+                                  ? 'bg-amber-500 border-amber-600 text-black font-extrabold shadow-lg shadow-amber-500/15' 
+                                  : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300'
+                              }`}
+                            >
+                              <div className="truncate">
+                                <span className="block font-bold text-sm">{getTeamName(activeBracketState.r4.finale.t2)}</span>
+                                <span className="text-[10px] opacity-70">{getTeamDrivers(activeBracketState.r4.finale.t2)}</span>
+                              </div>
+                              {activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t2 && <span className="text-[10px] bg-black text-amber-400 px-2.5 py-0.5 rounded">POKALSIEGER</span>}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TAB: 4. HAUPTRENNEN ==================== */}
+        {activeTab === 'hauptrennen' && (
+          <div className="space-y-6">
+            <div className="border-b border-zinc-800 pb-2">
+              <h2 className="text-xl font-extrabold uppercase text-amber-400">🏁 Disziplin 4: 3 Rennen mit allen Teams</h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Es werden 3 getrennte Läufe gefahren. Für **jede gefahrene Runde** erhält das Team **5 Punkte**.
+              </p>
+            </div>
+
+            {!isRaceReleased && role !== 'admin' && (
+              <div className="bg-zinc-900 border border-amber-500/20 rounded-xl p-8 text-center space-y-3">
+                <Lock className="w-10 h-10 text-amber-500 mx-auto animate-pulse" />
+                <h3 className="font-extrabold text-sm uppercase text-zinc-200">Hauptrennen unter Verschluss</h3>
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                  Die Runden und Punkte aus den 3 Läufen des Hauptrennens werden von der Rennleitung geheim eingetragen. Das Endergebnis wird nach dem letzten Lauf freigegeben!
+                </p>
+              </div>
+            )}
+
+            {(isRaceReleased || role === 'admin' || role === 'referee') && (
+              <>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
+                  <h3 className="text-sm font-black uppercase text-amber-400 flex items-center gap-1.5">
+                    <Flag className="w-4 h-4 text-amber-500" />
+                    Vorschrift: Startaufstellung (Reversed Grid)
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Die Startaufstellung passt sich live an eure Teamanzahl ({teams.length}) an: Wer am meisten Punkte hat, startet ganz hinten!
+                  </p>
+
+                  <div className="bg-zinc-950 rounded-xl p-4 border border-zinc-855">
+                    <span className="text-[10px] text-zinc-500 uppercase font-black block mb-2">🚥 Startaufstellung (Pole Position zuerst)</span>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                      {reverseGrid.map((team, index) => (
+                        <div 
+                          key={team.id} 
+                          className="p-2.5 bg-zinc-900 rounded border border-zinc-800 flex flex-col justify-between"
+                        >
+                          <span className="font-mono text-xl font-black text-amber-400">#{index + 1}</span>
+                          <span className="font-bold text-zinc-200 text-xs truncate mt-1 block">#{team.number} {team.name}</span>
+                          <span className="text-[9px] text-zinc-500 font-mono mt-0.5">{team.totalPoints} Pkt Gesamt</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                  <div className="p-4 bg-zinc-950 border-b border-zinc-850">
+                    <span className="text-xs font-bold uppercase text-zinc-300 font-mono">
+                      {role === 'admin' || role === 'referee' ? 'Rundeneingabe für die 3 Läufe' : 'Aktuelle Runden-Übersicht der Rennen'}
+                    </span>
+                  </div>
+                  
+                  <div className="divide-y divide-zinc-850">
+                    {teams.map(team => {
+                      const r1 = team.race1Laps || 0;
+                      const r2 = team.race2Laps || 0;
+                      const r3 = team.race3Laps || 0;
+                      const totalRacePoints = (r1 + r2 + r3) * 5;
+                      const isEditable = canEditTeam(team);
+
+                      return (
+                        <div key={team.id} className={`p-4 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                          isEditable ? 'bg-amber-500/5' : 'hover:bg-zinc-900/30'
+                        }`}>
+                          <div>
+                            <span className="font-extrabold text-zinc-100 text-sm block">#{team.number} {team.name}</span>
+                            <span className="text-xs text-zinc-500">Starter: {team.p1} & {team.p2}</span>
+                            <span className="text-xs text-amber-400 font-bold block mt-1 font-mono">
+                              {r1 + r2 + r3} Gesamtrunden = {totalRacePoints} Punkte
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-4 items-center shrink-0">
+                            <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-850 text-center w-28">
+                              <span className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Rennen 1</span>
+                              <div className="flex items-center justify-center gap-1.5">
+                                {isEditable && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => updateRaceLaps(team.id, 'race1Laps', -1)}
+                                    className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded flex items-center justify-center text-xs"
+                                  >
+                                    -
+                                  </button>
+                                )}
+                                <span className="font-mono text-sm font-bold text-zinc-200">{r1}</span>
+                                {isEditable && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => updateRaceLaps(team.id, 'race1Laps', 1)}
+                                    className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded flex items-center justify-center text-xs"
+                                  >
+                                    +
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-850 text-center w-28">
+                              <span className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Rennen 2</span>
+                              <div className="flex items-center justify-center gap-1.5">
+                                {isEditable && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => updateRaceLaps(team.id, 'race2Laps', -1)}
+                                    className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded flex items-center justify-center text-xs"
+                                  >
+                                    -
+                                  </button>
+                                )}
+                                <span className="font-mono text-sm font-bold text-zinc-200">{r2}</span>
+                                {isEditable && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => updateRaceLaps(team.id, 'race2Laps', 1)}
+                                    className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded flex items-center justify-center text-xs"
+                                  >
+                                    +
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-850 text-center w-28">
+                              <span className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Rennen 3</span>
+                              <div className="flex items-center justify-center gap-1.5">
+                                {isEditable && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => updateRaceLaps(team.id, 'race3Laps', -1)}
+                                    className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded flex items-center justify-center text-xs"
+                                  >
+                                    -
+                                  </button>
+                                )}
+                                <span className="font-mono text-sm font-bold text-zinc-200">{r3}</span>
+                                {isEditable && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => updateRaceLaps(team.id, 'race3Laps', 1)}
+                                    className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded flex items-center justify-center text-xs"
+                                  >
+                                    +
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TAB: REGELWERK ==================== */}
+        {activeTab === 'regeln' && (
+          <div className="space-y-6">
+            <div className="border-b border-zinc-800 pb-2">
+              <h2 className="text-xl font-extrabold uppercase text-amber-400 flex items-center gap-2">
+                <BookOpen className="w-5 h-5" /> Offizielles Regelwerk 2026
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Kattberger Koppelrennen – Regelübersicht und Punktevergabe
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl space-y-2">
+                <h3 className="font-black text-sm uppercase text-amber-400 flex items-center gap-2">
+                  🎯 1. Disziplin: Ringstechen
+                </h3>
+                <ul className="text-xs text-zinc-300 space-y-1.5 list-disc list-inside">
+                  <li>Jedes Team hat insgesamt <strong>5 Versuche</strong> mit Lanze/Stecher.</li>
+                  <li>Pro erfolgreichem Treffer gibt es <strong>5 Punkte</strong>.</li>
+                  <li>Maximal erreichbar: <strong>25 Punkte</strong>.</li>
+                </ul>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl space-y-2">
+                <h3 className="font-black text-sm uppercase text-amber-400 flex items-center gap-2">
+                  ⏱ 2. Disziplin: Beste Runde
+                </h3>
+                <ul className="text-xs text-zinc-300 space-y-1.5 list-disc list-inside">
+                  <li>Beide Fahrer fahren eine Einzelrunde auf Zeit auf der Koppel.</li>
+                  <li>Rundenzeiten werden zur <strong>Team-Gesamtzeit</strong> addiert.</li>
+                  <li><strong>1. Platz:</strong> 30 Pkt | <strong>2. Platz:</strong> 20 Pkt | <strong>3. Platz:</strong> 10 Pkt</li>
+                </ul>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl space-y-2">
+                <h3 className="font-black text-sm uppercase text-amber-400 flex items-center gap-2">
+                  ⚔ 3. Disziplin: Catch Me If You Can
+                </h3>
+                <ul className="text-xs text-zinc-300 space-y-1.5 list-disc list-inside">
+                  <li>Direktes K.O.-Turnier bis Platz 1 ausgefahren ist (inkl. Spiel um Platz 3).</li>
+                  <li><strong>1. Platz (Pokalsieger):</strong> 30 Punkte</li>
+                  <li><strong>2. Platz:</strong> 20 Punkte</li>
+                  <li><strong>3. Platz:</strong> 10 Punkte</li>
+                </ul>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl space-y-2">
+                <h3 className="font-black text-sm uppercase text-amber-400 flex items-center gap-2">
+                  🏁 4. Disziplin: Hauptrennen (3 Läufe)
+                </h3>
+                <ul className="text-xs text-zinc-300 space-y-1.5 list-disc list-inside">
+                  <li>Es werden 3 getrennte Hauptrennen gefahren.</li>
+                  <li><strong>Startaufstellung (Reversed Grid):</strong> Pole Position für das Team mit den *wenigsten* Punkten.</li>
+                  <li>Pro gefahrener Runde gibt es <strong>5 Punkte</strong>.</li>
+                  <li>Hauptrennen bleibt geheim bis zur offiziellen Freigabe!</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* POPUP: LOGIN MODAL */}
+      {showPinModal && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleLoginSubmit} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+            <div className="text-center">
+              <Lock className="w-10 h-10 text-amber-500 mx-auto mb-2 animate-bounce" />
+              <h3 className="font-black text-lg uppercase text-zinc-100">
+                {loginType === 'admin' ? 'Rennleitung Freischalten' : loginType === 'referee' ? 'Schiedsrichter Login' : 'Team Login'}
+              </h3>
+            </div>
+
+            <div className="flex bg-zinc-950 p-1 rounded-lg border border-zinc-850 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginType('admin');
+                  setPinInput('');
+                  setPinError(false);
+                }}
+                className={`flex-1 py-1.5 rounded transition ${loginType === 'admin' ? 'bg-amber-500 text-black' : 'text-zinc-500'}`}
+              >
+                Rennleitung
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginType('referee');
+                  if (referees.length > 0) setSelectedRefId(referees[0].id);
+                  setPinInput('');
+                  setPinError(false);
+                }}
+                className={`flex-1 py-1.5 rounded transition ${loginType === 'referee' ? 'bg-emerald-500 text-black' : 'text-zinc-500'}`}
+              >
+                Schiedsrichter
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginType('team');
+                  if (teams.length > 0) setSelectedTeamId(teams[0].id);
+                  setPinInput('');
+                  setPinError(false);
+                }}
+                className={`flex-1 py-1.5 rounded transition ${loginType === 'team' ? 'bg-blue-500 text-white' : 'text-zinc-500'}`}
+              >
+                Team
+              </button>
+            </div>
+
+            {loginType === 'referee' && (
+              <div>
+                <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Schiedsrichter auswählen</label>
+                <select
+                  value={selectedRefId}
+                  onChange={(e) => setSelectedRefId(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100"
+                >
+                  {referees.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {loginType === 'team' && (
+              <div>
+                <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Dein Team auswählen</label>
+                <select
+                  value={selectedTeamId}
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100"
+                >
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>#{t.number} {t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Passwort / PIN</label>
+              <input 
+                type="password" 
+                placeholder="PIN eingeben"
+                value={pinInput}
+                onChange={(e) => {
+                  setPinInput(e.target.value);
+                  setPinError(false);
+                }}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded p-2.5 text-center text-lg font-mono text-zinc-100 placeholder-zinc-800"
+                required
+              />
+              {pinError && (
+                <span className="text-red-500 text-xs font-bold text-center block mt-1 animate-pulse">
+                  Falscher PIN-Code! Bitte erneut versuchen.
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowPinModal(false);
+                  setPinInput('');
+                  setPinError(false);
+                }}
+                className="flex-1 py-2 bg-zinc-850 hover:bg-zinc-800 rounded text-xs font-bold transition"
+              >
+                Abbrechen
+              </button>
+              <button 
+                type="submit" 
+                className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded text-xs font-bold transition"
+              >
+                Freischalten
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* POPUP: IN-APP BESTÄTIGUNG */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-sm text-center space-y-4 shadow-2xl">
+            <AlertTriangle className="w-12 h-10 text-amber-500 mx-auto" />
+            <h3 className="font-black text-lg uppercase text-zinc-100">{confirmModal.title}</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">{confirmModal.message}</p>
+            <div className="flex gap-2.5 pt-2">
+              <button 
+                type="button" 
+                onClick={() => setConfirmModal({ isOpen: false, title: '', message: '', action: null })}
+                className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-755 text-zinc-300 rounded-lg text-xs font-bold transition"
+              >
+                Abbrechen
+              </button>
+              <button 
+                type="button" 
+                onClick={confirmModal.action}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition"
+              >
+                Ja, Ausführen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP: QR-CODE & HANDY VERBINDUNG */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-sm text-center space-y-4 shadow-2xl relative">
+            <h3 className="font-black text-lg uppercase text-amber-400">Handys live koppeln!</h3>
+            <p className="text-xs text-zinc-400">
+              Scanne diesen QR-Code mit den Handys deiner Kumpels. Alle Handys syncen sich automatisch in Echtzeit!
+            </p>
+
+            <div className="bg-white p-3 rounded-xl inline-block mx-auto border border-zinc-800 shadow-md">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(shareUrl || getPublicUrl() || 'https://kattberger-koppelrennen.de')}`} 
+                alt="QR-Code zur Live-Kopplung"
+                className="w-48 h-48 block mx-auto"
+                onError={(e) => {
+                  const targetData = shareUrl || getPublicUrl() || 'https://kattberger-koppelrennen.de';
+                  if (!e.target.dataset.triedQuickChart) {
+                    e.target.dataset.triedQuickChart = 'true';
+                    e.target.src = `https://quickchart.io/qr?text=${encodeURIComponent(targetData)}&size=220`;
+                  } else if (!e.target.dataset.triedGoogle) {
+                    e.target.dataset.triedGoogle = 'true';
+                    e.target.src = `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(targetData)}`;
+                  }
+                }}
+              />
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <label className="text-[10px] uppercase font-bold text-zinc-500 block">
+                Erkannte Live-Webadresse
+              </label>
+              <input 
+                type="text" 
+                value={shareUrl} 
+                onChange={(e) => setShareUrl(e.target.value)}
+                placeholder="https://dein-koppelrennen.app"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-amber-400 font-mono focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button 
+                type="button"
+                onClick={copyShareLink}
+                className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 border border-zinc-700"
+              >
+                {copiedLink ? (
+                  <><Check className="w-4 h-4 text-emerald-400" /> Link kopiert!</>
+                ) : (
+                  <><Share2 className="w-4 h-4" /> Link kopieren</>
+                )}
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => setShowShareModal(false)}
+                className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-black rounded-lg text-xs font-bold transition"
+              >
+                Zurück zum Rennen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="max-w-xl mx-auto text-center px-4 mt-12 text-zinc-500 space-y-4">
+        <div className="border-t border-zinc-900 pt-6">
+          <p className="text-xs font-mono">
+            Kattberger Koppelrennen 2026 &copy; 2026 · Alle Handys syncen automatisch über die Cloud.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
