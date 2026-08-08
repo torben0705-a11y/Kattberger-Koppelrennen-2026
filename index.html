@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kattberger Koppelrennen 2026 - Live-Board</title>
+  
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.2.0",
+      "react/": "https://esm.sh/react@18.2.0/",
+      "react-dom": "https://esm.sh/react-dom@18.2.0",
+      "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+      "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+      "lucide-react": "https://esm.sh/lucide-react@0.263.1?deps=react@18.2.0"
+    }
+  }
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #09090b;
+      color: #f4f4f5;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .font-bebas {
+      font-family: 'Bebas Neue', sans-serif;
+      letter-spacing: 1px;
+    }
+    .scrollbar-none::-webkit-scrollbar { display: none; }
+    .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    .poster-box {
+      background: #121214;
+      border: 2px solid #27272a;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen overflow-x-hidden">
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module" data-presets="react">
+    import React, { useState, useEffect, useRef, useMemo } from 'react';
+    import ReactDOM from 'react-dom/client';
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    import { 
+      Trophy, Clock, Play, Pause, RotateCcw, Plus, Trash2, Users, MapPin, Calendar, 
+      Award, ChevronRight, Flag, Zap, CheckCircle, AlertTriangle, User, ShieldAlert, 
+      Sliders, RefreshCw, Share2, Check, Lock, Unlock, Edit3, Save, X, Shield, Key, 
+      BookOpen, ArrowUpDown, QrCode, Car, Flame, Radio, Bell, Timer, Utensils, Megaphone, Package,
+      Flame as CrashIcon, Eye, Tv
+    } from 'lucide-react';
+
+    let app, auth, db, appId;
+    const hasFirebase = true;
+
+    try {
+      const firebaseConfig = {
+        apiKey: "AIzaSyDMe86kEYEBcgZbfiufgW3sfd-4pKqB-9A",
+        authDomain: "koppelrennen.firebaseapp.com",
+        projectId: "koppelrennen",
+        appId: "1:998537960327:web:fef730981a02a4e31f5122"
+      };
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+      appId = "1:998537960327:web:fef730981a02a4e31f5122";
+    } catch (e) {
+      console.error("Firebase Init Error:", e);
+    }
+
+    const initialTeams = [
+      { id: '1', number: '1', name: 'Team Ackerschreck', p1: 'Lars', p2: 'Micha', car: 'BMW', pin: '1111', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '2', number: '2', name: 'Rostlaube Racing', p1: 'Niklas', p2: 'Henning', car: '', pin: '2222', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '3', number: '3', name: 'Turbo Schnäggn', p1: 'Knolle', p2: 'Laura', car: 'Bora', pin: '3333', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '4', number: '4', name: 'Biernot Motorsport', p1: 'Steven', p2: 'Dennis', car: 'Opel Corsa B', pin: '4444', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '6', number: '6', name: 'Die Schrottplatz-Könige', p1: 'Patrick', p2: 'Thomas', car: 'Audi TT', pin: '6666', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '7', number: '7', name: 'Kolbenfresser-Crew', p1: 'Matzi', p2: 'Morty', car: 'Opel Astra', pin: '7777', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '8', number: '8', name: 'Kattberger Turbo', p1: 'Flauschi', p2: 'Bjarne', car: 'Golf 4 Variant 4Motion', pin: '8888', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '9', number: '9', name: 'Wiesen-Wühler', p1: 'Jesco', p2: 'Till', car: 'Ford Focus Mk1', pin: '9999', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '10', number: '10', name: 'Kattberger Rennschweine', p1: 'Torben', p2: 'Daniel', car: 'Golf IV', pin: '1010', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '11', number: '11', name: 'Larme Enten', p1: 'Phillip', p2: 'Christoph', car: 'Golf 3', pin: '1111', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '12', number: '12', name: 'Team Plattfuß', p1: 'Flo', p2: 'Matze', car: 'Rennsemmel', pin: '1112', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 },
+      { id: '13', number: '13', name: 'Cop Killer', p1: 'Lasse', p2: 'Alex', car: 'Rennsemmel', pin: '1212', ringHits: [false, false, false, false, false], t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false, penalties: 0, penaltyReason: '', customPoints: 0 }
+    ];
+
+    const getStoredValue = (key, fallback) => {
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const saved = localStorage.getItem(`kattberger_${key}`);
+          if (saved) return JSON.parse(saved);
+        }
+      } catch (e) {}
+      return fallback;
+    };
+
+    const generateInitialBracket = (teamList) => {
+      const activeTeams = teamList.filter(t => !t.eliminated);
+      const N = activeTeams.length;
+      if (N < 4) return null;
+
+      const sortedTeams = [...activeTeams].sort((a, b) => {
+        const timeA = (a.t1 > 0 && a.t2 > 0) ? (a.t1 + a.t2) : 999999;
+        const timeB = (b.t1 > 0 && b.t2 > 0) ? (b.t1 + b.t2) : 999999;
+        if (timeA !== 999999 && timeB !== 999999) return timeB - timeA;
+        const ringA = a.ringHits ? a.ringHits.filter(Boolean).length * 5 : 0;
+        const ringB = b.ringHits ? b.ringHits.filter(Boolean).length * 5 : 0;
+        return ringA - ringB;
+      });
+
+      const r1Matches = [];
+      for (let i = 0; i < sortedTeams.length - 1; i += 2) {
+        r1Matches.push({
+          id: `r1_m${Math.floor(i/2)}`,
+          t1: sortedTeams[i].id,
+          t2: sortedTeams[i+1].id,
+          winner: ''
+        });
+      }
+
+      const numR2 = Math.ceil(r1Matches.length / 2);
+      const r2Matches = [];
+      for (let i = 0; i < numR2; i++) {
+        r2Matches.push({
+          id: `r2_m${i}`,
+          t1: '',
+          t2: '',
+          winner: ''
+        });
+      }
+
+      const r3Matches = [
+        { id: 'r3_m0', t1: '', t2: '', winner: '' },
+        { id: 'r3_m1', t1: '', t2: '', winner: '' }
+      ];
+
+      const r4 = {
+        finale: { id: 'r4_finale', t1: '', t2: '', winner: '' },
+        platz3: { id: 'r4_p3', t1: '', t2: '', winner: '' }
+      };
+
+      return {
+        type: 'kattberger_special',
+        r1: r1Matches,
+        r2: r2Matches,
+        r3: r3Matches,
+        r4: r4
+      };
+    };
+
+    const computeKattbergerTree = (bracketState, allTeams) => {
+      if (!bracketState || bracketState.type !== 'kattberger_special') return bracketState;
+      const b = JSON.parse(JSON.stringify(bracketState));
+
+      b.r1.forEach(m => {
+        if (m.winner && m.winner !== m.t1 && m.winner !== m.t2) m.winner = '';
+      });
+
+      const r1Winners = b.r1.map(m => m.winner).filter(Boolean);
+
+      for (let i = 0; i < b.r2.length; i++) {
+        b.r2[i].t1 = r1Winners[i * 2] || '';
+        b.r2[i].t2 = r1Winners[i * 2 + 1] || '';
+        if (b.r2[i].winner && b.r2[i].winner !== b.r2[i].t1 && b.r2[i].winner !== b.r2[i].t2) {
+          b.r2[i].winner = '';
+        }
+      }
+
+      const r2Winners = b.r2.map(m => m.winner).filter(Boolean);
+      const r2Losers = [];
+      b.r2.forEach(m => {
+        if (m.winner) {
+          const loser = m.winner === m.t1 ? m.t2 : m.t1;
+          if (loser) r2Losers.push(loser);
+        }
+      });
+
+      let luckyLoser = '';
+      if (r2Losers.length > 0) {
+        const sortedLosers = [...r2Losers].sort((idA, idB) => {
+          const tA = allTeams.find(t => t.id === idA);
+          const tB = allTeams.find(t => t.id === idB);
+          const sumA = (tA?.t1 > 0 && tA?.t2 > 0) ? (tA.t1 + tA.t2) : 999999;
+          const sumB = (tB?.t1 > 0 && tB?.t2 > 0) ? (tB.t1 + tB.t2) : 999999;
+          return sumA - sumB;
+        });
+        luckyLoser = sortedLosers[0] || '';
+      }
+
+      const semiTeams = [...r2Winners];
+      if (luckyLoser && !semiTeams.includes(luckyLoser) && semiTeams.length < 4) {
+        semiTeams.push(luckyLoser);
+      }
+
+      if (b.r3 && b.r3.length >= 2) {
+        b.r3[0].t1 = semiTeams[0] || '';
+        b.r3[0].t2 = semiTeams[1] || '';
+        b.r3[1].t1 = semiTeams[2] || '';
+        b.r3[1].t2 = semiTeams[3] || '';
+        b.r3.forEach(m => {
+          if (m.winner && m.winner !== m.t1 && m.winner !== m.t2) m.winner = '';
+        });
+      }
+
+      if (b.r4) {
+        b.r4.finale.t1 = b.r3?.[0]?.winner || '';
+        b.r4.finale.t2 = b.r3?.[1]?.winner || '';
+        if (b.r4.finale.winner && b.r4.finale.winner !== b.r4.finale.t1 && b.r4.finale.winner !== b.r4.finale.t2) {
+          b.r4.finale.winner = '';
+        }
+
+        const getLoser = (m) => m && m.winner ? (m.winner === m.t1 ? m.t2 : m.t1) : '';
+        b.r4.platz3.t1 = getLoser(b.r3?.[0]);
+        b.r4.platz3.t2 = getLoser(b.r3?.[1]);
+        if (b.r4.platz3.winner && b.r4.platz3.winner !== b.r4.platz3.t1 && b.r4.platz3.winner !== b.r4.platz3.t2) {
+          b.r4.platz3.winner = '';
+        }
+      }
+
+      return b;
+    };
+
+    const getCatchMePodiumInternal = (state) => {
+      if (!state || state.type !== 'kattberger_special' || !state.r4) return { p1: '', p2: '', p3: '' };
+      const winner1 = state.r4.finale?.winner || '';
+      const loser1 = winner1 ? (winner1 === state.r4.finale.t1 ? state.r4.finale.t2 : state.r4.finale.t1) : '';
+      const third = state.r4.platz3?.winner || '';
+      return { p1: winner1, p2: loser1, p3: third };
+    };
+
+    const getCatchMePointsInternal = (teamId, state) => {
+      const podium = getCatchMePodiumInternal(state);
+      if (podium.p1 === teamId) return 30;
+      if (podium.p2 === teamId) return 20;
+      if (podium.p3 === teamId) return 10;
+      return 0;
+    };
+
+    const getCatchMeRanks = (teamList, bState) => {
+      const ranks = {};
+      const activeTeams = teamList.filter(t => !t.eliminated);
+      const N = activeTeams.length;
+      if (N === 0) return ranks;
+      activeTeams.forEach((t, idx) => { ranks[t.id] = idx + 1; });
+      const podium = getCatchMePodiumInternal(bState);
+      if (podium.p1) ranks[podium.p1] = N;
+      if (podium.p2) ranks[podium.p2] = N - 1;
+      if (podium.p3) ranks[podium.p3] = N - 2;
+      return ranks;
+    };
+
+    function App() {
+      const [teams, setTeams] = useState(() => getStoredValue('teams', initialTeams));
+      const [bracket, setBracket] = useState(() => getStoredValue('bracket', generateInitialBracket(initialTeams)));
+      const [adminPin, setAdminPin] = useState(() => getStoredValue('adminPin', '24977'));
+      const [isRaceReleased, setIsRaceReleased] = useState(() => getStoredValue('isRaceReleased', false));
+      const [racePhase, setRacePhase] = useState(() => getStoredValue('racePhase', 'setup'));
+      const [stats, setStats] = useState({ totalVisits: 1, activeUsers: 1 });
+      
+      const [currentTime, setCurrentTime] = useState(() => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      
+      useEffect(() => {
+        const timeInterval = setInterval(() => {
+          setCurrentTime(new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        }, 1000);
+        return () => clearInterval(timeInterval);
+      }, []);
+
+      const [activeTab, setActiveTab] = useState('tagesablauf');
+      const [role, setRole] = useState('viewer');
+      const [activeTeamId, setActiveTeamId] = useState('');
+      const [activeRaceGrid, setActiveRaceGrid] = useState(1);
+      const [bestLapSortMode, setBestLapSortMode] = useState('number');
+      const [activeCatchMeTab, setActiveCatchMeTab] = useState('r1');
+
+      const [showPinModal, setShowPinModal] = useState(false);
+      const [loginType, setLoginType] = useState('admin');
+      const [selectedTeamId, setSelectedTeamId] = useState('');
+      const [pinInput, setPinInput] = useState('');
+      const [pinError, setPinError] = useState(false);
+
+      const [user, setUser] = useState(null);
+      const [dbSynced, setDbSynced] = useState(false);
+      const [copiedLink, setCopiedLink] = useState(false);
+      const [showShareModal, setShowShareModal] = useState(false);
+
+      const getPublicUrl = () => {
+        try {
+          if (typeof window !== 'undefined' && window.location && window.location.href) {
+            const u = window.location.href;
+            if (u && !u.startsWith('about:') && !u.startsWith('blob:') && !u.includes('srcdoc')) return u;
+          }
+        } catch (e) {}
+        return typeof window !== 'undefined' ? window.location.href : '';
+      };
+
+      const [shareUrl, setShareUrl] = useState(getPublicUrl);
+
+      const openShareModal = () => {
+        const currentUrl = getPublicUrl();
+        if (currentUrl) setShareUrl(currentUrl);
+        setShowShareModal(true);
+      };
+
+      const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', action: null });
+
+      const [editingTeamId, setEditingTeamId] = useState(null);
+      const [editNumber, setEditNumber] = useState('');
+      const [editName, setEditName] = useState('');
+      const [editP1, setEditP1] = useState('');
+      const [editP2, setEditP2] = useState('');
+      const [editCar, setEditCar] = useState('');
+      const [editPin, setEditPin] = useState('');
+      const [editCustomPoints, setEditCustomPoints] = useState(0);
+
+      const [newTeamNumber, setNewTeamNumber] = useState('');
+      const [newTeamName, setNewTeamName] = useState('');
+      const [newTeamP1, setNewTeamP1] = useState('');
+      const [newTeamP2, setNewTeamP2] = useState('');
+      const [newTeamCar, setNewTeamCar] = useState('');
+      const [newTeamPin, setNewTeamPin] = useState('');
+
+      useEffect(() => {
+        const syncInterval = setInterval(() => {
+          try {
+            const localTeams = localStorage.getItem('kattberger_teams');
+            const localBracket = localStorage.getItem('kattberger_bracket');
+            const localReleased = localStorage.getItem('kattberger_isRaceReleased');
+            const localPhase = localStorage.getItem('kattberger_racePhase');
+            if (localTeams) {
+              const parsed = JSON.parse(localTeams);
+              if (JSON.stringify(parsed) !== JSON.stringify(teams)) setTeams(parsed);
+            }
+            if (localBracket) {
+              const parsed = JSON.parse(localBracket);
+              if (JSON.stringify(parsed) !== JSON.stringify(bracket)) setBracket(parsed);
+            }
+            if (localReleased !== null) {
+              const parsed = JSON.parse(localReleased);
+              if (parsed !== isRaceReleased) setIsRaceReleased(parsed);
+            }
+            if (localPhase) {
+              const parsed = JSON.parse(localPhase);
+              if (parsed !== racePhase) setRacePhase(parsed);
+            }
+          } catch (e) {}
+        }, 1500);
+        return () => clearInterval(syncInterval);
+      }, [teams, bracket, isRaceReleased, racePhase]);
+
+      useEffect(() => {
+        if (!hasFirebase) return;
+        const initAuth = async () => {
+          try { await signInAnonymously(auth); } catch (err) {}
+        };
+        initAuth();
+        const unsubAuth = onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
+        return () => unsubAuth();
+      }, []);
+
+      useEffect(() => {
+        if (!hasFirebase || !user) return;
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'raceState', 'main');
+        const unsubSnap = onSnapshot(docRef, async (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.teams) setTeams(data.teams);
+            if (data.bracket) setBracket(data.bracket);
+            if (data.adminPin) setAdminPin(data.adminPin);
+            if (typeof data.isRaceReleased === 'boolean') setIsRaceReleased(data.isRaceReleased);
+            if (data.racePhase) setRacePhase(data.racePhase);
+            if (data.stats) setStats(data.stats);
+
+            const hasVisited = sessionStorage.getItem('kattberger_visited');
+            if (!hasVisited) {
+              sessionStorage.setItem('kattberger_visited', 'true');
+              const newTotal = (data.stats?.totalVisits || 0) + 1;
+              try {
+                await setDoc(docRef, { stats: { totalVisits: newTotal, activeUsers: (data.stats?.activeUsers || 1) } }, { merge: true });
+              } catch (e) {}
+            }
+          } else {
+            const freshBracket = generateInitialBracket(initialTeams);
+            setDoc(docRef, { 
+              teams: initialTeams, 
+              bracket: freshBracket, 
+              adminPin: '24977', 
+              isRaceReleased: false,
+              racePhase: 'setup',
+              stats: { totalVisits: 1, activeUsers: 1 }
+            });
+          }
+          setDbSynced(true);
+        }, (err) => setDbSynced(false));
+        return () => unsubSnap();
+      }, [user]);
+
+      const saveToCloud = async (newTeams, newBracket = null, newAdminPin = null, newReleased = null, newPhase = null) => {
+        if (newTeams) setTeams(newTeams);
+        if (newBracket) setBracket(newBracket);
+        if (newAdminPin) setAdminPin(newAdminPin);
+        if (typeof newReleased === 'boolean') setIsRaceReleased(newReleased);
+        if (newPhase) setRacePhase(newPhase);
+
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            if (newTeams) localStorage.setItem('kattberger_teams', JSON.stringify(newTeams));
+            if (newBracket) localStorage.setItem('kattberger_bracket', JSON.stringify(newBracket));
+            if (newAdminPin) localStorage.setItem('kattberger_adminPin', JSON.stringify(newAdminPin));
+            if (typeof newReleased === 'boolean') localStorage.setItem('kattberger_isRaceReleased', JSON.stringify(newReleased));
+            if (newPhase) localStorage.setItem('kattberger_racePhase', JSON.stringify(newPhase));
+          }
+        } catch (e) {}
+
+        if (hasFirebase && user) {
+          try {
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'raceState', 'main');
+            const updateData = {};
+            if (newTeams) updateData.teams = newTeams;
+            if (newBracket) updateData.bracket = newBracket;
+            if (newAdminPin) updateData.adminPin = newAdminPin;
+            if (typeof newReleased === 'boolean') updateData.isRaceReleased = newReleased;
+            if (newPhase) updateData.racePhase = newPhase;
+            await setDoc(docRef, updateData, { merge: true });
+          } catch (e) {}
+        }
+      };
+
+      const activeTeamsList = useMemo(() => teams.filter(t => !t.eliminated), [teams]);
+
+      const canEditTeam = (team) => {
+        if (!team) return false;
+        if (role === 'admin') return true;
+        return false;
+      };
+
+      const canEditMatch = (match) => {
+        if (!match) return false;
+        if (role === 'admin') return true;
+        return false;
+      };
+
+      const activeTeamObj = useMemo(() => teams.find(t => t.id === activeTeamId), [teams, activeTeamId]);
+
+      const getRingPoints = (team) => {
+        const hitsCount = team.ringHits ? team.ringHits.filter(Boolean).length : 0;
+        return hitsCount * 5;
+      };
+
+      const getLapTimesRankings = () => {
+        const teamsWithTimes = activeTeamsList
+          .filter(t => t.t1 > 0 && t.t2 > 0)
+          .map(t => ({ id: t.id, totalTime: t.t1 + t.t2 }))
+          .sort((a, b) => a.totalTime - b.totalTime);
+        const rankings = {};
+        teamsWithTimes.forEach((item, index) => {
+          if (index === 0) rankings[item.id] = 30;
+          else if (index === 1) rankings[item.id] = 20;
+          else if (index === 2) rankings[item.id] = 10;
+          else rankings[item.id] = 0;
+        });
+        return rankings;
+      };
+
+      const activeBracketState = useMemo(() => bracket ? computeKattbergerTree(bracket, teams) : null, [bracket, teams]);
+
+      const getCatchMePodium = () => {
+        return getCatchMePodiumInternal(activeBracketState);
+      };
+
+      const getCatchMePoints = (teamId) => {
+        if (!activeBracketState) return 0;
+        return getCatchMePointsInternal(teamId, activeBracketState);
+      };
+
+      const getRacePoints = (team) => {
+        if (!isRaceReleased && role !== 'admin') return 0;
+        const totalLaps = (team.race1Laps || 0) + (team.race2Laps || 0) + (team.race3Laps || 0);
+        return totalLaps * 5;
+      };
+
+      const calculateTotalPoints = (team, lapRankings) => {
+        if (team.eliminated) return 0;
+        const ring = getRingPoints(team);
+        const lapBonus = lapRankings[team.id] || 0;
+        const catchMe = getCatchMePoints(team.id);
+        const racePoints = getRacePoints(team);
+        const custom = team.customPoints || 0;
+        const penalties = team.penalties || 0;
+        return ring + lapBonus + catchMe + racePoints + custom - penalties;
+      };
+
+      const getLeaderboard = () => {
+        const lapRankings = getLapTimesRankings();
+        return [...teams]
+          .filter(t => !t.eliminated)
+          .map(t => ({
+            ...t,
+            totalPoints: calculateTotalPoints(t, lapRankings),
+            ringPoints: getRingPoints(t),
+            lapPoints: lapRankings[t.id] || 0,
+            catchMePoints: getCatchMePoints(t.id),
+            racePoints: getRacePoints(t)
+          }))
+          .sort((a, b) => {
+            if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+            return (parseInt(a.number) || 0) - (parseInt(b.number) || 0);
+          });
+      };
+
+      const catchMeRanks = useMemo(() => getCatchMeRanks(teams, activeBracketState), [teams, activeBracketState]);
+
+      const gridRace1 = useMemo(() => [...activeTeamsList].sort((a, b) => {
+        const rankA = catchMeRanks[a.id] || 999;
+        const rankB = catchMeRanks[b.id] || 999;
+        if (rankA !== rankB) return rankB - rankA;
+        return calculateTotalPoints(b, getLapTimesRankings()) - calculateTotalPoints(a, getLapTimesRankings());
+      }), [activeTeamsList, catchMeRanks]);
+      
+      const gridRace2 = useMemo(() => [...activeTeamsList].sort((a, b) => {
+        const lapsA = a.race1Laps || 0;
+        const lapsB = b.race1Laps || 0;
+        if (lapsA !== lapsB) return lapsA - lapsB;
+        return calculateTotalPoints(b, getLapTimesRankings()) - calculateTotalPoints(a, getLapTimesRankings());
+      }), [activeTeamsList, teams, activeBracketState]);
+
+      const gridRace3 = useMemo(() => [...activeTeamsList].sort((a, b) => {
+        const lapsA = a.race2Laps || 0;
+        const lapsB = b.race2Laps || 0;
+        if (lapsA !== lapsB) return lapsA - lapsB;
+        return calculateTotalPoints(b, getLapTimesRankings()) - calculateTotalPoints(a, getLapTimesRankings());
+      }), [activeTeamsList, teams, activeBracketState]);
+
+      const getBesteRundeLeaderboard = () => {
+        const list = [...activeTeamsList];
+        if (bestLapSortMode === 'number') return list.sort((a, b) => (parseInt(a.number) || 0) - (parseInt(b.number) || 0));
+        return list.sort((a, b) => {
+          const aHas = a.t1 > 0 && a.t2 > 0;
+          const bHas = b.t1 > 0 && b.t2 > 0;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          return (a.t1 + a.t2) - (b.t1 + b.t2);
+        });
+      };
+
+      const toggleRingHit = (teamId, attemptIndex) => {
+        const team = teams.find(t => t.id === teamId);
+        if (!team || !canEditTeam(team)) return;
+        const newTeams = teams.map(t => {
+          if (t.id === teamId) {
+            const newHits = [...(t.ringHits || [false, false, false, false, false])];
+            newHits[attemptIndex] = !newHits[attemptIndex];
+            return { ...t, ringHits: newHits };
+          }
+          return t;
+        });
+        saveToCloud(newTeams);
+      };
+
+      const saveDriverTime = (teamId, driverKey, seconds) => {
+        const team = teams.find(t => t.id === teamId);
+        if (!team || !canEditTeam(team)) return;
+        const newTeams = teams.map(t => t.id === teamId ? { ...t, [driverKey]: parseFloat(seconds) || 0 } : t);
+        const updatedBracket = generateInitialBracket(newTeams);
+        saveToCloud(newTeams, updatedBracket);
+      };
+
+      const updateRaceLaps = (teamId, raceKey, delta) => {
+        const team = teams.find(t => t.id === teamId);
+        if (!team || !canEditTeam(team)) return;
+        const newTeams = teams.map(t => t.id === teamId ? { ...t, [raceKey]: Math.max(0, (t[raceKey] || 0) + delta) } : t);
+        saveToCloud(newTeams);
+      };
+
+      const setExactRaceLaps = (teamId, raceKey, valStr) => {
+        const team = teams.find(t => t.id === teamId);
+        if (!team || !canEditTeam(team)) return;
+        const val = parseInt(valStr, 10);
+        const newTeams = teams.map(t => t.id === teamId ? { ...t, [raceKey]: isNaN(val) ? 0 : Math.max(0, val) } : t);
+        saveToCloud(newTeams);
+      };
+
+      const toggleDriverChanges = (teamId, raceKey) => {
+        const team = teams.find(t => t.id === teamId);
+        if (!team || !canEditTeam(team)) return;
+        const newTeams = teams.map(t => t.id === teamId ? { ...t, [raceKey]: !t[raceKey] } : t);
+        saveToCloud(newTeams);
+      };
+
+      const handleAddTeam = (e) => {
+        e.preventDefault();
+        if (role !== 'admin') return;
+        if (!newTeamName.trim()) return;
+        const newTeam = {
+          id: Date.now().toString(),
+          number: newTeamNumber.trim() || (teams.length + 1).toString(),
+          name: newTeamName.trim(),
+          p1: newTeamP1.trim() || 'Fahrer 1',
+          p2: newTeamP2.trim() || 'Fahrer 2',
+          car: newTeamCar.trim() || '',
+          pin: newTeamPin.trim() || '1234',
+          ringHits: [false, false, false, false, false],
+          t1: 0, t2: 0, race1Laps: 0, race2Laps: 0, race3Laps: 0,
+          r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false,
+          penalties: 0, penaltyReason: '', customPoints: 0, eliminated: false
+        };
+        const updated = [...teams, newTeam];
+        saveToCloud(updated, generateInitialBracket(updated));
+        setNewTeamNumber(''); setNewTeamName(''); setNewTeamP1(''); setNewTeamP2(''); setNewTeamCar(''); setNewTeamPin('');
+      };
+
+      const toggleElimination = (teamId) => {
+        if (role !== 'admin') return;
+        const updated = teams.map(t => t.id === teamId ? { ...t, eliminated: !t.eliminated } : t);
+        saveToCloud(updated, generateInitialBracket(updated));
+      };
+
+      const triggerDeleteTeam = (teamId, teamName) => {
+        if (role !== 'admin') return;
+        setConfirmModal({
+          isOpen: true,
+          title: 'Team löschen?',
+          message: `Möchtest du "${teamName}" entfernen?`,
+          action: () => {
+            const updated = teams.filter(t => t.id !== teamId);
+            saveToCloud(updated, generateInitialBracket(updated));
+            setConfirmModal({ isOpen: false, title: '', message: '', action: null });
+          }
+        });
+      };
+
+      const saveTeamSetup = (e) => {
+        e.preventDefault();
+        if (role !== 'admin') return;
+        const newTeams = teams.map(t => t.id === editingTeamId ? {
+          ...t, number: editNumber || t.number, name: editName, p1: editP1, p2: editP2, car: editCar, pin: editPin || t.pin,
+          customPoints: parseInt(editCustomPoints) || 0
+        } : t);
+        saveToCloud(newTeams);
+        setEditingTeamId(null);
+      };
+
+      const startEditingTeam = (team) => {
+        if (role !== 'admin') return;
+        setEditingTeamId(team.id);
+        setEditNumber(team.number || '');
+        setEditName(team.name);
+        setEditP1(team.p1);
+        setEditP2(team.p2);
+        setEditCar(team.car || '');
+        setEditPin(team.pin || '1234');
+        setEditCustomPoints(team.customPoints || 0);
+      };
+
+      const handleShuffleBracket = () => {
+        if (role !== 'admin') return;
+        saveToCloud(null, generateInitialBracket(teams));
+      };
+
+      const handleSetWinner = (roundKey, matchIndex, winnerId) => {
+        if (role !== 'admin') return;
+        let updated = JSON.parse(JSON.stringify(bracket));
+        if (roundKey === 'r1') updated.r1[matchIndex].winner = winnerId;
+        else if (roundKey === 'r2') updated.r2[matchIndex].winner = winnerId;
+        else if (roundKey === 'r3') updated.r3[matchIndex].winner = winnerId;
+        else if (roundKey === 'finale') updated.r4.finale.winner = winnerId;
+        else if (roundKey === 'platz3') updated.r4.platz3.winner = winnerId;
+
+        saveToCloud(null, updated);
+      };
+
+      const handleResetEverything = () => {
+        if (role !== 'admin') return;
+        setConfirmModal({
+          isOpen: true,
+          title: 'Alles zurücksetzen?',
+          message: 'Möchtest du alle Zeiten, Treffer und Duelle löschen?',
+          action: () => {
+            const reset = teams.map(t => ({
+              ...t, ringHits: [false, false, false, false, false], t1: 0, t2: 0,
+              race1Laps: 0, race2Laps: 0, race3Laps: 0, r1ChangesDone: false, r2ChangesDone: false, r3ChangesDone: false,
+              penalties: 0, penaltyReason: '', customPoints: 0, eliminated: false
+            }));
+            saveToCloud(reset, generateInitialBracket(reset), null, null, 'setup');
+            setConfirmModal({ isOpen: false, title: '', message: '', action: null });
+          }
+        });
+      };
+
+      const copyShareLink = () => {
+        const u = shareUrl || getPublicUrl() || window.location.href;
+        const ta = document.createElement('textarea');
+        ta.value = u; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        setCopiedLink(true); setTimeout(() => setCopiedLink(false), 3000);
+      };
+
+      const handleLoginSubmit = (e) => {
+        e.preventDefault();
+        if (loginType === 'admin') {
+          if (pinInput === adminPin) { setRole('admin'); setShowPinModal(false); setPinInput(''); setPinError(false); }
+          else setPinError(true);
+        } else if (loginType === 'team') {
+          const t = teams.find(x => x.id === selectedTeamId);
+          if (t && pinInput === (t.pin || '1234')) { setRole('team'); setActiveTeamId(t.id); setShowPinModal(false); setPinInput(''); setPinError(false); }
+          else setPinError(true);
+        } else if (loginType === 'tv') {
+          if (pinInput === '1111') { setRole('tv'); setShowPinModal(false); setPinInput(''); setPinError(false); }
+          else setPinError(true);
+        }
+      };
+
+      const getTeamName = (id) => { const t = teams.find(x => x.id === id); return t ? `#${t.number} ${t.name}` : 'Noch offen'; };
+      const sortedLeaderboard = getLeaderboard();
+      const currentGrid = activeRaceGrid === 1 ? gridRace1 : activeRaceGrid === 2 ? gridRace2 : gridRace3;
+      const catchMePodium = getCatchMePodium();
+
+      const renderTvDynamicPanel = () => {
+        const titleClass = "text-[11px] font-black uppercase text-emerald-400 font-bebas tracking-wider border-b border-zinc-800 pb-0.5 shrink-0 mb-1";
+
+        if (racePhase === 'setup' || racePhase === 'ringstechen') {
+          return (
+            <React.Fragment>
+              <h2 className={titleClass}>Startliste ({activeTeamsList.length} Teams)</h2>
+              <div className="grid grid-cols-2 gap-1 overflow-y-auto scrollbar-none flex-1 mt-1">
+                {activeTeamsList.map(t => (
+                  <div key={t.id} className="bg-zinc-950 border border-zinc-800 p-1.5 rounded text-[9px] flex items-center justify-between">
+                    <span className="font-mono font-bold text-amber-400">#{t.number}</span>
+                    <span className="font-bold text-zinc-200 truncate">{t.name}</span>
+                  </div>
+                ))}
+              </div>
+            </React.Fragment>
+          );
+        }
+
+        if (racePhase === 'schnellsteRunde') {
+          const sorted = [...activeTeamsList].sort((a,b) => parseInt(a.number) - parseInt(b.number));
+          return (
+            <React.Fragment>
+              <h2 className={titleClass}>Startreihenfolge: Beste Runde</h2>
+              <div className="grid grid-cols-2 gap-1 overflow-y-auto scrollbar-none flex-1 mt-1">
+                {sorted.map(t => (
+                  <div key={t.id} className="bg-zinc-950 border border-zinc-800 p-1.5 rounded text-[9px] flex items-center gap-2">
+                    <span className="font-mono font-bold text-amber-400 w-4">#{t.number}</span>
+                    <span className="font-bold text-zinc-200 truncate">{t.name}</span>
+                  </div>
+                ))}
+              </div>
+            </React.Fragment>
+          );
+        }
+
+        if (racePhase === 'catchMe') {
+          return (
+            <React.Fragment>
+              <h2 className={titleClass}>Live: Catch Me If You Can</h2>
+              <div className="flex flex-col gap-1.5 overflow-y-auto scrollbar-none flex-1 mt-1 text-[9px]">
+                <div>
+                  <span className="text-amber-400 font-bold uppercase block mb-0.5">Vorrunde:</span>
+                  <div className="space-y-1">
+                    {activeBracketState?.r1?.map((m, i) => (
+                      <div key={m.id} className="bg-zinc-950 border border-zinc-800 p-1 rounded flex justify-between items-center">
+                        <span className="font-mono text-zinc-500">#{i+1}</span>
+                        <span className={`truncate font-bold ${m.winner === m.t1 ? 'text-amber-400' : 'text-zinc-300'}`}>{m.t1 ? getTeamName(m.t1) : '...'}</span>
+                        <span className="text-zinc-600 font-black">VS</span>
+                        <span className={`truncate font-bold ${m.winner === m.t2 ? 'text-amber-400' : 'text-zinc-300'}`}>{m.t2 ? getTeamName(m.t2) : '...'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-amber-400 font-bold uppercase block mb-0.5 mt-1">Zwischenrunde:</span>
+                  <div className="space-y-1">
+                    {activeBracketState?.r2?.map((m, i) => (
+                      <div key={m.id} className="bg-zinc-950 border border-zinc-800 p-1 rounded flex justify-between items-center">
+                        <span className="font-mono text-zinc-500">#{i+1}</span>
+                        <span className={`truncate font-bold ${m.winner === m.t1 ? 'text-amber-400' : 'text-zinc-300'}`}>{m.t1 ? getTeamName(m.t1) : 'Offen'}</span>
+                        <span className="text-zinc-600 font-black">VS</span>
+                        <span className={`truncate font-bold ${m.winner === m.t2 ? 'text-amber-400' : 'text-zinc-300'}`}>{m.t2 ? getTeamName(m.t2) : 'Offen'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-amber-400 font-bold uppercase block mb-0.5 mt-1">Halbfinale & Finale:</span>
+                  <div className="space-y-1">
+                    {activeBracketState?.r3?.map((m, i) => (
+                      <div key={m.id} className="bg-zinc-950 border border-zinc-800 p-1 rounded flex justify-between items-center">
+                        <span className="font-mono text-zinc-500">HF #{i+1}</span>
+                        <span className={`truncate font-bold ${m.winner === m.t1 ? 'text-amber-400' : 'text-zinc-300'}`}>{m.t1 ? getTeamName(m.t1) : 'Offen'}</span>
+                        <span className="text-zinc-600 font-black">VS</span>
+                        <span className={`truncate font-bold ${m.winner === m.t2 ? 'text-amber-400' : 'text-zinc-300'}`}>{m.t2 ? getTeamName(m.t2) : 'Offen'}</span>
+                      </div>
+                    ))}
+                    {activeBracketState?.r4?.finale && (
+                      <div className="bg-amber-500/10 border border-amber-500/30 p-1 rounded flex justify-between items-center">
+                        <span className="font-mono text-amber-400 font-bold">FINALE</span>
+                        <span className={`truncate font-bold ${activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t1 ? 'text-amber-300' : 'text-zinc-200'}`}>{activeBracketState.r4.finale.t1 ? getTeamName(activeBracketState.r4.finale.t1) : 'Offen'}</span>
+                        <span className="text-zinc-600 font-black">VS</span>
+                        <span className={`truncate font-bold ${activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t2 ? 'text-amber-300' : 'text-zinc-200'}`}>{activeBracketState.r4.finale.t2 ? getTeamName(activeBracketState.r4.finale.t2) : 'Offen'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </React.Fragment>
+          );
+        }
+
+        if (racePhase.startsWith('race')) {
+          const grid = racePhase === 'race1' ? gridRace1 : racePhase === 'race2' ? gridRace2 : gridRace3;
+          const phaseNum = racePhase.replace('race', '');
+          return (
+            <React.Fragment>
+              <h2 className={titleClass}>Startaufstellung: Destruction Derby Lauf {phaseNum}</h2>
+              <div className="grid grid-cols-2 gap-1 overflow-y-auto scrollbar-none flex-1 mt-1">
+                {grid.map((t, idx) => (
+                  <div key={t.id} className="bg-zinc-950 border border-zinc-800 p-1.5 rounded text-[9px] flex items-center gap-2">
+                    <span className="font-mono font-black text-amber-400 bg-black px-1.5 py-0.5 rounded border border-zinc-800">{idx + 1}</span>
+                    <span className="font-bold text-zinc-200 truncate">#{t.number} {t.name}</span>
+                  </div>
+                ))}
+              </div>
+            </React.Fragment>
+          );
+        }
+
+        if (racePhase === 'siegerehrung') {
+          return (
+            <React.Fragment>
+              <h2 className={titleClass}>Die Sieger 2026</h2>
+              <div className="flex flex-col gap-1.5 overflow-y-auto scrollbar-none flex-1 mt-1">
+                {sortedLeaderboard.slice(0, 3).map((t, idx) => (
+                  <div key={t.id} className={`p-2.5 rounded border flex items-center gap-3 ${idx === 0 ? 'bg-amber-500/20 border-amber-500 text-amber-400' : idx === 1 ? 'bg-zinc-300/20 border-zinc-400 text-zinc-300' : 'bg-amber-700/20 border-amber-800 text-amber-600'}`}>
+                    <span className="text-3xl">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
+                    <div className="flex flex-col">
+                       <span className="font-black text-sm uppercase">{t.name}</span>
+                       <span className="text-[10px] opacity-80">{t.totalPoints} Punkte Gesamt</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </React.Fragment>
+          );
+        }
+
+        return null;
+      };
+
+      if (role === 'tv') {
+        return (
+          <div className="h-screen w-screen bg-zinc-950 text-zinc-100 font-sans p-2 overflow-hidden flex flex-col justify-between box-border">
+            <div className="max-w-[1700px] mx-auto w-full h-full flex flex-col justify-between space-y-1.5">
+              
+              <header className="flex items-center justify-between border-b border-zinc-800 pb-1.5 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🏁</span>
+                  <div>
+                    <h1 className="text-xl font-black uppercase text-zinc-100 font-bebas tracking-wide leading-none">
+                      Kattberger Koppelrennen 2026 - Live Display
+                    </h1>
+                    <p className="text-[9px] text-amber-500 font-bold uppercase tracking-widest leading-none mt-1">Offizielle Rennansicht &bull; {currentTime}</p>
+                  </div>
+                </div>
+                <button onClick={() => setRole('viewer')} className="bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white px-2.5 py-1 rounded text-[9px] font-bold uppercase border border-zinc-800 transition">
+                  Beenden
+                </button>
+              </header>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 flex-1 min-h-0">
+                
+                <div className="lg:col-span-7 bg-zinc-900 border border-zinc-800 rounded-md overflow-hidden shadow-xl flex flex-col min-h-0">
+                  <div className="p-2 bg-zinc-900/90 border-b border-zinc-800 flex justify-between items-center shrink-0">
+                    <h2 className="text-xs font-black uppercase text-amber-400 font-bebas tracking-wider">Gesamtstand</h2>
+                    <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/50">● Live</span>
+                  </div>
+                  <div className="overflow-x-auto flex-1">
+                    <table className="w-full text-left border-collapse text-[11px]">
+                      <thead>
+                        <tr className="bg-zinc-950 text-[9px] uppercase text-zinc-400 border-b border-zinc-800 tracking-wider">
+                          <th className="p-1.5 text-center w-8">Pos</th>
+                          <th className="p-1.5">Team</th>
+                          <th className="p-1.5 text-center">🎯 Ringstechen</th>
+                          <th className="p-1.5 text-center">⏱ Beste Runde</th>
+                          <th className="p-1.5 text-center">⚔ Catch Me</th>
+                          <th className="p-1.5 text-center">🚗 Derby</th>
+                          <th className="p-1.5 text-center font-bold text-amber-400 bg-amber-500/10">Gesamt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800">
+                        {sortedLeaderboard.map((team, idx) => (
+                          <tr key={team.id} className="hover:bg-zinc-900/40 transition">
+                            <td className="p-1.5 text-center font-mono font-bold text-[11px]">
+                              {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                            </td>
+                            <td className="p-1.5">
+                              <span className="font-extrabold text-zinc-100 text-[11px] block leading-tight">#{team.number} {team.name}</span>
+                              <span className="text-[9px] text-zinc-400 leading-none mt-0.5 block">{team.p1} & {team.p2}</span>
+                            </td>
+                            <td className="p-1.5 text-center font-mono">{team.ringPoints}</td>
+                            <td className="p-1.5 text-center font-mono">{team.lapPoints}</td>
+                            <td className="p-1.5 text-center font-mono">{team.catchMePoints}</td>
+                            <td className="p-1.5 text-center font-mono">{isRaceReleased ? team.racePoints : '🔒'}</td>
+                            <td className="p-1.5 text-center font-mono font-black text-xs text-amber-400 bg-amber-500/5">
+                              {team.totalPoints}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 flex flex-col gap-2 min-h-0">
+                  
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-md p-2 shadow-lg shrink-0">
+                    <h2 className="text-[10px] font-black uppercase text-amber-400 font-bebas tracking-wider border-b border-zinc-800 pb-0.5 mb-1.5">Status / Ablauf</h2>
+                    <div className="grid grid-cols-2 gap-1 text-[9px]">
+                      <div className={`p-1 rounded border flex justify-between ${racePhase === 'ringstechen' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-zinc-950 border-zinc-800'}`}>
+                        <span className="font-bold">10:00</span><span className="font-bold">Ringstechen</span>
+                      </div>
+                      <div className={`p-1 rounded border flex justify-between ${racePhase === 'schnellsteRunde' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-zinc-950 border-zinc-800'}`}>
+                        <span className="font-bold">10:45</span><span className="font-bold">Beste Runde</span>
+                      </div>
+                      <div className={`p-1 rounded border flex justify-between ${racePhase === 'setup' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-zinc-950 border-zinc-800'}`}>
+                        <span className="font-bold">12:00</span><span className="font-bold">Mittagspause</span>
+                      </div>
+                      <div className={`p-1 rounded border flex justify-between ${racePhase === 'catchMe' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-zinc-950 border-zinc-800'}`}>
+                        <span className="font-bold">13:15</span><span className="font-bold">Catch Me</span>
+                      </div>
+                      <div className={`p-1 rounded border flex justify-between ${racePhase.startsWith('race') ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-zinc-950 border-zinc-800'}`}>
+                        <span className="font-bold">14:15</span><span className="font-bold">Destruction Derby</span>
+                      </div>
+                      <div className={`p-1 rounded border flex justify-between ${racePhase === 'siegerehrung' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-zinc-950 border-zinc-800'}`}>
+                        <span className="font-bold">16:30</span><span className="font-bold">Siegerehrung</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-md p-2 shadow-lg flex-1 flex flex-col min-h-0">
+                    {renderTvDynamicPanel()}
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            <footer className="text-center text-[9px] text-zinc-500 pt-1 border-t border-zinc-900 font-mono shrink-0">
+              Kattberger Koppelrennen 2026 · Offizieller Beamer- & Fernseher-Stream
+            </footer>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans pb-16 overflow-x-hidden">
+          
+          <div className={`w-full text-center py-2 px-3 text-xs font-bold flex flex-wrap items-center justify-between gap-2 ${
+            role === 'admin' ? 'bg-amber-500 text-black' : role === 'team' ? 'bg-blue-500 text-white' : 'bg-zinc-900 text-zinc-400 border-b border-zinc-800'
+          }`}>
+            <div className="flex items-center gap-1.5 truncate">
+              {role !== 'viewer' ? <Unlock className="w-4 h-4 shrink-0" /> : <Lock className="w-4 h-4 text-zinc-500 shrink-0" />}
+              <span className="truncate">
+                {role === 'admin' ? 'Rennleitung' : role === 'team' ? `Team: #${activeTeamObj?.number} ${activeTeamObj?.name}` : 'Zuschauer-Modus'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 bg-black/30 px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300">
+              <Clock className="w-3 h-3 text-amber-400" />
+              <span>{currentTime}</span>
+            </div>
+
+            {role !== 'viewer' ? (
+              <button onClick={() => { setRole('viewer'); setActiveTeamId(''); }} className="bg-black text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0">
+                Ausloggen
+              </button>
+            ) : (
+              <button onClick={() => { setLoginType('admin'); setPinInput(''); setPinError(false); setShowPinModal(true); }} className="bg-amber-500 hover:bg-amber-600 text-black px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0">
+                Anmelden
+              </button>
+            )}
+          </div>
+
+          <header className="relative bg-black border-b border-zinc-800 py-4 px-3 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px]"></div>
+            <div className="relative max-w-md mx-auto">
+              <div className="flex justify-center items-center gap-1.5 mb-1">
+                <span className="text-sm">🏁</span>
+                <span className="bg-amber-500 text-black text-[10px] font-black px-2 py-0.5 uppercase tracking-widest rounded">
+                  Kattberger Koppelrennen 2026
+                </span>
+                <span className="text-sm">🏁</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight uppercase text-zinc-100 font-bebas">
+                OFFIZIELLES LIVE-BOARD
+              </h1>
+              
+              <div className="mt-2 flex items-center justify-center gap-3">
+                <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-zinc-950 border border-zinc-800 text-amber-400 rounded-full text-[10px] font-mono font-bold shadow">
+                  <Clock className="w-3 h-3 text-amber-500" /> <span>{currentTime}</span>
+                </div>
+                <button onClick={openShareModal} className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-black rounded-full text-[10px] font-bold font-mono transition shadow">
+                  <Share2 className="w-3 h-3" /> Handys koppeln
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="sticky top-0 z-30 bg-zinc-950 border-b border-zinc-800 p-1.5 shadow-lg">
+            <div className="max-w-md mx-auto flex justify-start sm:justify-center overflow-x-auto gap-1.5 scrollbar-none px-1">
+              <button onClick={() => setActiveTab('tagesablauf')} className={`px-3 py-2 rounded text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition ${activeTab === 'tagesablauf' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                🏠 Ablauf
+              </button>
+              <button onClick={() => setActiveTab('leaderboard')} className={`px-3 py-2 rounded text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition ${activeTab === 'leaderboard' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                🏆 Gesamtstand
+              </button>
+              <button onClick={() => setActiveTab('teams')} className={`px-3 py-2 rounded text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition ${activeTab === 'teams' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                👥 Teams
+              </button>
+              <button onClick={() => setActiveTab('regeln')} className={`px-3 py-2 rounded text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition ${activeTab === 'regeln' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                📜 Regeln
+              </button>
+            </div>
+          </div>
+
+          <main className="max-w-md mx-auto px-2 sm:px-3 mt-3">
+
+            {role === 'admin' && (
+              <div className="mb-3 bg-zinc-900 border border-emerald-500/40 p-2.5 rounded-xl shadow-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-black text-[11px] uppercase text-emerald-400 flex items-center gap-1.5"><Tv className="w-3.5 h-3.5"/> Event-Regie (Steuert die TV-Anzeige)</h3>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { id: 'setup', label: 'Mittagspause' },
+                    { id: 'ringstechen', label: 'Ringstechen' },
+                    { id: 'schnellsteRunde', label: 'Beste Runde' },
+                    { id: 'catchMe', label: 'Catch Me' },
+                    { id: 'race1', label: 'Derby 1' },
+                    { id: 'race2', label: 'Derby 2' },
+                    { id: 'race3', label: 'Derby 3' },
+                    { id: 'siegerehrung', label: 'Sieger' }
+                  ].map(p => (
+                    <button
+                       key={p.id}
+                       onClick={() => saveToCloud(null, null, null, null, p.id)}
+                       className={`py-1.5 px-1 text-[10px] font-bold rounded transition truncate ${racePhase === p.id ? 'bg-emerald-500 text-black shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white'}`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {activeTab === 'tagesablauf' && (
+              <div className="bg-[#111113] border-2 border-zinc-800 rounded-xl p-3 sm:p-5 shadow-xl space-y-3">
+                <div className="text-center pb-2 border-b-2 border-zinc-800">
+                  <h2 className="text-3xl sm:text-4xl font-bebas text-zinc-100 tracking-wider">TAGESABLAUF</h2>
+                  <div className="w-20 h-1 bg-amber-500 mx-auto mt-0.5"></div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <button onClick={() => setActiveTab('ringstechen')} className="w-full text-left poster-box p-2.5 rounded-lg flex items-center justify-between group">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg sm:text-xl font-bebas font-black text-amber-400 tracking-wider shrink-0 w-12">10:00<br/><span className="text-[9px] text-zinc-500">UHR</span></span>
+                      <div className="border-l border-zinc-800 pl-2.5 flex items-center gap-2 min-w-0">
+                        <Bell className="w-4 h-4 text-amber-500 shrink-0" />
+                        <span className="text-sm sm:text-base font-bebas tracking-wider text-zinc-100 truncate">RINGSTECHEN</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+                  </button>
+
+                  <button onClick={() => setActiveTab('schnellsteRunde')} className="w-full text-left poster-box p-2.5 rounded-lg flex items-center justify-between group">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg sm:text-xl font-bebas font-black text-amber-400 tracking-wider shrink-0 w-12">10:45<br/><span className="text-[9px] text-zinc-500">UHR</span></span>
+                      <div className="border-l border-zinc-800 pl-2.5 flex items-center gap-2 min-w-0">
+                        <Timer className="w-4 h-4 text-amber-500 shrink-0" />
+                        <span className="text-sm sm:text-base font-bebas tracking-wider text-zinc-100 truncate">BESTE RUNDE</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+                  </button>
+
+                  <div className="poster-box p-2.5 rounded-lg flex items-center gap-2.5 opacity-75">
+                    <span className="text-base sm:text-lg font-bebas font-black text-zinc-500 tracking-wider shrink-0 w-12">12:00<br/><span className="text-[9px] text-zinc-600">PAUSE</span></span>
+                    <div className="border-l border-zinc-800 pl-2.5 flex items-center gap-2 min-w-0">
+                      <Utensils className="w-4 h-4 text-zinc-400 shrink-0" />
+                      <span className="text-base font-bebas tracking-wider text-zinc-300 truncate">MITTAGSPAUSE</span>
+                    </div>
+                  </div>
+
+                  <button onClick={() => setActiveTab('catchMe')} className="w-full text-left poster-box p-2.5 rounded-lg flex items-center justify-between group">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg sm:text-xl font-bebas font-black text-amber-400 tracking-wider shrink-0 w-12">13:15<br/><span className="text-[9px] text-zinc-500">UHR</span></span>
+                      <div className="border-l border-zinc-800 pl-2.5 min-w-0">
+                        <span className="text-sm sm:text-base font-bebas tracking-wider text-zinc-100 block truncate">CATCH ME IF YOU CAN</span>
+                        <span className="text-[8px] text-zinc-500 truncate block">(Zwei Teams gegeneinander)</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+                  </button>
+
+                  <button onClick={() => { setActiveTab('hauptrennen'); setActiveRaceGrid(1); }} className="w-full text-left poster-box p-2.5 rounded-lg flex items-center justify-between group">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg sm:text-xl font-bebas font-black text-amber-400 tracking-wider shrink-0 w-12">14:15<br/><span className="text-[9px] text-zinc-500">UHR</span></span>
+                      <div className="border-l border-zinc-800 pl-2.5 flex items-center gap-2 min-w-0">
+                        <CrashIcon className="w-4 h-4 text-amber-500 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-sm sm:text-base font-bebas tracking-wider text-zinc-100 block truncate">DESTRUCTION DERBY</span>
+                          <span className="text-[8px] text-zinc-500 block">(Lauf 1)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+                  </button>
+
+                  <button onClick={() => { setActiveTab('hauptrennen'); setActiveRaceGrid(2); }} className="w-full text-left poster-box p-2.5 rounded-lg flex items-center justify-between group">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg sm:text-xl font-bebas font-black text-amber-400 tracking-wider shrink-0 w-12">15:00<br/><span className="text-[9px] text-zinc-500">UHR</span></span>
+                      <div className="border-l border-zinc-800 pl-2.5 flex items-center gap-2 min-w-0">
+                        <CrashIcon className="w-4 h-4 text-amber-500 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-sm sm:text-base font-bebas tracking-wider text-zinc-100 block truncate">DESTRUCTION DERBY</span>
+                          <span className="text-[8px] text-zinc-500 block">(Lauf 2)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+                  </button>
+
+                  <button onClick={() => { setActiveTab('hauptrennen'); setActiveRaceGrid(3); }} className="w-full text-left poster-box p-2.5 rounded-lg flex items-center justify-between group">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg sm:text-xl font-bebas font-black text-amber-400 tracking-wider shrink-0 w-12">15:45<br/><span className="text-[9px] text-zinc-500">UHR</span></span>
+                      <div className="border-l border-zinc-800 pl-2.5 flex items-center gap-2 min-w-0">
+                        <CrashIcon className="w-4 h-4 text-amber-500 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-sm sm:text-base font-bebas tracking-wider text-zinc-100 block truncate">DESTRUCTION DERBY</span>
+                          <span className="text-[8px] text-zinc-500 block">(Lauf 3)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+                  </button>
+
+                  <button onClick={() => setActiveTab('leaderboard')} className="w-full text-left poster-box p-2.5 rounded-lg flex items-center justify-between group">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg sm:text-xl font-bebas font-black text-amber-400 tracking-wider shrink-0 w-12">16:30<br/><span className="text-[9px] text-zinc-500">UHR</span></span>
+                      <div className="border-l border-zinc-800 pl-2.5 flex items-center gap-2 min-w-0">
+                        <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
+                        <span className="text-sm sm:text-base font-bebas tracking-wider text-zinc-100 truncate">SIEGEREHRUNG</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+                  </button>
+
+                  <a href="https://maps.google.com/?q=54.773026,9.618607" target="_blank" rel="noopener noreferrer" className="block poster-box p-2.5 rounded-lg hover:border-amber-500 transition">
+                    <div className="flex items-center gap-2.5">
+                      <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-black uppercase text-zinc-300 block">ADRESSE:</span>
+                        <span className="text-[10px] text-zinc-400 truncate block">Kattberg 1, 24977 Grundhof</span>
+                      </div>
+                    </div>
+                  </a>
+                </div>
+
+                <div className="pt-2.5 border-t border-zinc-800 text-center space-y-1.5">
+                  <div className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded text-[10px] text-zinc-300">
+                    <Package className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Geparkt wird hinten auf der Koppel</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-1 text-amber-400 pt-1">
+                    <Megaphone className="w-3.5 h-3.5 shrink-0" />
+                    <span className="text-xs font-bebas tracking-wider">KOMMT GERNE ZUM ZUSCHAUEN!</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'leaderboard' && (
+              <div className="space-y-3">
+                {role === 'admin' && (
+                  <div className="bg-zinc-900 border border-amber-500/30 p-2.5 rounded-lg flex items-center justify-between gap-2 shadow">
+                    <div>
+                      <h3 className="font-black text-[11px] uppercase text-amber-400">Rennleitung</h3>
+                      <p className="text-[9px] text-zinc-400">{isRaceReleased ? 'Destruction Derby freigegeben' : 'Destruction Derby verborgen'}</p>
+                    </div>
+                    <button type="button" onClick={() => saveToCloud(null, null, null, !isRaceReleased, null)} className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase ${isRaceReleased ? 'bg-zinc-800 text-zinc-300' : 'bg-amber-500 text-black'}`}>
+                      {isRaceReleased ? '🔒 Verbergen' : '🏁 Freigeben'}
+                    </button>
+                  </div>
+                )}
+
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow">
+                  <div className="p-2.5 bg-zinc-900/80 border-b border-zinc-800 flex justify-between items-center">
+                    <h2 className="text-xs font-black uppercase text-amber-400">Gesamtstand</h2>
+                    {role === 'admin' && (
+                      <button onClick={handleResetEverything} className="bg-red-600/10 text-red-400 border border-red-900/30 font-bold text-[9px] px-2 py-0.5 rounded">
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-[11px]">
+                      <thead>
+                        <tr className="bg-zinc-950 text-[9px] uppercase text-zinc-400 border-b border-zinc-800">
+                          <th className="p-2 text-center w-6">Pos</th>
+                          <th className="p-2">Team</th>
+                          <th className="p-2 text-center cursor-pointer hover:text-amber-400" onClick={() => setActiveTab('ringstechen')}>🎯 Ringstechen</th>
+                          <th className="p-2 text-center cursor-pointer hover:text-amber-400" onClick={() => setActiveTab('schnellsteRunde')}>⏱ Beste Runde</th>
+                          <th className="p-2 text-center cursor-pointer hover:text-amber-400" onClick={() => setActiveTab('catchMe')}>⚔ Catch Me</th>
+                          <th className="p-2 text-center cursor-pointer hover:text-amber-400" onClick={() => setActiveTab('hauptrennen')}>{isRaceReleased || role === 'admin' ? '🚗 Derby' : '🔒'}</th>
+                          <th className="p-2 text-center font-bold text-amber-400 bg-amber-500/5">Pkt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800">
+                        {sortedLeaderboard.map((team, idx) => (
+                          <tr key={team.id} className="hover:bg-zinc-900/40">
+                            <td className="p-2 text-center font-mono font-bold">
+                              {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                            </td>
+                            <td className="p-2 min-w-[100px]">
+                              <span className="font-extrabold text-zinc-200 block truncate max-w-[120px]">#{team.number} {team.name}</span>
+                              <span className="text-[9px] text-zinc-500 truncate block max-w-[120px]">{team.p1} & {team.p2}</span>
+                            </td>
+                            <td className="p-2 text-center font-mono cursor-pointer hover:text-amber-400 hover:underline" onClick={() => setActiveTab('ringstechen')}>
+                              {team.ringPoints}
+                            </td>
+                            <td className="p-2 text-center font-mono cursor-pointer hover:text-amber-400 hover:underline" onClick={() => setActiveTab('schnellsteRunde')}>
+                              {team.lapPoints}
+                            </td>
+                            <td className="p-2 text-center font-mono cursor-pointer hover:text-amber-400 hover:underline" onClick={() => setActiveTab('catchMe')}>
+                              {team.catchMePoints}
+                            </td>
+                            <td className="p-2 text-center font-mono cursor-pointer hover:text-amber-400 hover:underline" onClick={() => setActiveTab('hauptrennen')}>
+                              {isRaceReleased || role === 'admin' ? team.racePoints : '🔒'}
+                            </td>
+                            <td className="p-2 text-center font-mono font-black text-amber-400 bg-amber-500/5">{team.totalPoints}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'teams' && (
+              <div className="space-y-3">
+                <div className="border-b border-zinc-800 pb-2">
+                  <h2 className="text-sm font-extrabold uppercase text-amber-400">👥 Teams ({activeTeamsList.length} aktiv)</h2>
+                </div>
+                
+                {role === 'admin' && (
+                  <form onSubmit={handleAddTeam} className="bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl space-y-2 text-xs">
+                    <h3 className="font-extrabold uppercase text-amber-400">Neues Team</h3>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input type="text" placeholder="Start-Nr." value={newTeamNumber} onChange={(e) => setNewTeamNumber(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded p-1.5 text-xs text-zinc-100 font-mono" />
+                      <input type="text" placeholder="Teamname" value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded p-1.5 text-xs text-zinc-100" required />
+                      <input type="text" placeholder="Fahrer 1" value={newTeamP1} onChange={(e) => setNewTeamP1(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded p-1.5 text-xs text-zinc-100" />
+                      <input type="text" placeholder="Fahrer 2" value={newTeamP2} onChange={(e) => setNewTeamP2(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded p-1.5 text-xs text-zinc-100" />
+                    </div>
+                    <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-black font-extrabold py-1.5 rounded uppercase text-[11px]">
+                      Hinzufügen
+                    </button>
+                  </form>
+                )}
+
+                <div className="grid grid-cols-1 gap-2">
+                  {teams.map(team => (
+                    <div key={team.id} className={`border p-2.5 rounded-xl space-y-1 relative text-xs ${team.eliminated ? 'bg-red-950/20 border-red-900/40 opacity-75' : 'bg-zinc-900/40 border-zinc-800'}`}>
+                      <span className="absolute top-2 right-2 font-mono text-[10px] text-amber-400 font-bold">#{team.number}</span>
+                      
+                      {editingTeamId === team.id ? (
+                        <form onSubmit={saveTeamSetup} className="space-y-2 pt-1">
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-zinc-500">Nr.</label>
+                              <input type="text" value={editNumber} onChange={(e) => setEditNumber(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 p-1 rounded text-xs font-mono text-zinc-100" />
+                            </div>
+                            <div className="col-span-2">
+                              <label className="text-[9px] uppercase font-bold text-zinc-500">Name</label>
+                              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 p-1 rounded text-xs text-zinc-100" required />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-zinc-500">F1</label>
+                              <input type="text" value={editP1} onChange={(e) => setEditP1(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 p-1 rounded text-xs text-zinc-100" required />
+                            </div>
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-zinc-500">F2</label>
+                              <input type="text" value={editP2} onChange={(e) => setEditP2(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 p-1 rounded text-xs text-zinc-100" required />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[9px] uppercase font-bold text-zinc-500">Fahrzeug</label>
+                            <input type="text" value={editCar} onChange={(e) => setEditCar(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 p-1 rounded text-xs text-zinc-100" />
+                          </div>
+                          <div>
+                            <label className="text-[9px] uppercase font-bold text-zinc-500">Team PIN</label>
+                            <input type="text" value={editPin} onChange={(e) => setEditPin(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 p-1 rounded text-xs font-mono text-amber-400" />
+                          </div>
+                          <div className="flex gap-1.5 pt-1">
+                            <button type="button" onClick={() => setEditingTeamId(null)} className="flex-1 py-1 bg-zinc-800 rounded text-xs font-bold">Abbrechen</button>
+                            <button type="submit" className="flex-1 py-1 bg-amber-500 text-black rounded text-xs font-bold">Speichern</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <h3 className={`font-extrabold ${team.eliminated ? 'text-red-400 line-through' : 'text-zinc-100'}`}>
+                            {team.name}
+                            {team.eliminated && <span className="ml-2 text-[8px] bg-red-600 text-white px-1 py-0.5 rounded not-italic no-underline">AUSGESCHIEDEN</span>}
+                          </h3>
+                          <p className="text-zinc-400 text-[10px]">Fahrer: {team.p1} & {team.p2}</p>
+                          {team.car && <p className="text-amber-500 text-[10px]">KFZ: {team.car}</p>}
+                          {role === 'admin' && (
+                            <div className="pt-2 mt-2 border-t border-zinc-800 flex justify-between gap-1">
+                              <button onClick={() => toggleElimination(team.id)} className={`flex-1 py-1 rounded text-[9px] font-bold ${team.eliminated ? 'bg-emerald-600 text-white' : 'bg-red-900 text-red-300'}`}>
+                                {team.eliminated ? 'Wieder aufnehmen' : 'Ausscheiden'}
+                              </button>
+                              <button onClick={() => triggerDeleteTeam(team.id, team.name)} className="px-2 bg-zinc-950 border border-zinc-800 text-zinc-600 hover:text-red-400 rounded">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => startEditingTeam(team)} className="px-2 bg-zinc-950 border border-zinc-800 text-amber-400 rounded text-[10px] font-bold">
+                                Edit
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'ringstechen' && (
+              <div className="space-y-2.5">
+                <div className="border-b border-zinc-800 pb-2 flex justify-between items-center text-xs">
+                  <div>
+                    <h2 className="font-extrabold uppercase text-amber-400">🎯 Ringstechen</h2>
+                    <p className="text-[10px] text-zinc-400">5 Versuche = je 5 Pkt.</p>
+                  </div>
+                  <button onClick={() => setActiveTab('tagesablauf')} className="bg-zinc-900 text-zinc-300 px-2 py-1 rounded">← Zurück</button>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {activeTeamsList.filter(t => role !== 'team' || t.id === activeTeamId).map(team => {
+                    const hits = team.ringHits ? team.ringHits.filter(Boolean).length : 0;
+                    const editable = canEditTeam(team);
+                    return (
+                      <div key={team.id} className="border border-zinc-800 bg-zinc-900/40 p-2.5 rounded-xl flex items-center justify-between gap-2 text-xs">
+                        <div className="min-w-0">
+                          <span className="font-extrabold text-zinc-100 block truncate">#{team.number} {team.name}</span>
+                          <span className="text-[10px] text-amber-400 font-mono font-bold">{hits * 5} Pkt ({hits}/5)</span>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          {(team.ringHits || [false, false, false, false, false]).map((hit, i) => (
+                            <button key={i} disabled={!editable} onClick={() => toggleRingHit(team.id, i)} className={`w-7 h-7 rounded font-bold text-[10px] border flex items-center justify-center ${hit ? 'bg-amber-500 text-black border-amber-600' : 'bg-zinc-950 text-zinc-600 border-zinc-800'}`}>
+                              {hit ? '✓' : i + 1}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'schnellsteRunde' && (
+              <div className="space-y-2.5">
+                <div className="border-b border-zinc-800 pb-2 flex justify-between items-center text-xs">
+                  <div>
+                    <h2 className="font-extrabold uppercase text-amber-400">⏱ Beste Runde</h2>
+                    <p className="text-[10px] text-zinc-400">LeMans Start (1.: 30, 2.: 20, 3.: 10 Pkt)</p>
+                  </div>
+                  <button onClick={() => setActiveTab('tagesablauf')} className="bg-zinc-900 text-zinc-300 px-2 py-1 rounded">← Zurück</button>
+                </div>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                  <table className="w-full text-left border-collapse text-[11px]">
+                    <thead>
+                      <tr className="bg-zinc-950 text-[9px] uppercase text-zinc-500 border-b border-zinc-800">
+                        <th className="p-2 text-center w-6">Pos</th>
+                        <th className="p-2">Team</th>
+                        <th className="p-2">F1</th>
+                        <th className="p-2">F2</th>
+                        <th className="p-2 text-center">Ges.</th>
+                        <th className="p-2 text-center text-amber-400">Pkt</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {getBesteRundeLeaderboard().filter(t => role !== 'team' || t.id === activeTeamId).map((team, idx) => {
+                        const total = team.t1 > 0 && team.t2 > 0 ? (team.t1 + team.t2).toFixed(2) : null;
+                        const bonus = getLapTimesRankings()[team.id] || 0;
+                        const editable = canEditTeam(team);
+                        return (
+                          <tr key={team.id} className="hover:bg-zinc-900/40">
+                            <td className="p-2 text-center font-mono font-bold">{idx + 1}</td>
+                            <td className="p-2 font-bold truncate max-w-[90px]">#{team.number} {team.name}</td>
+                            <td className="p-2">
+                              {editable ? <input type="number" step="0.01" value={team.t1 || ''} onChange={(e) => saveDriverTime(team.id, 't1', e.target.value)} className="w-14 bg-zinc-950 border border-zinc-800 p-1 rounded font-mono text-center text-zinc-200 text-[10px]" /> : `${team.t1 || 0}s`}
+                            </td>
+                            <td className="p-2">
+                              {editable ? <input type="number" step="0.01" value={team.t2 || ''} onChange={(e) => saveDriverTime(team.id, 't2', e.target.value)} className="w-14 bg-zinc-950 border border-zinc-800 p-1 rounded font-mono text-center text-zinc-200 text-[10px]" /> : `${team.t2 || 0}s`}
+                            </td>
+                            <td className="p-2 text-center font-mono">{total ? `${total}s` : '-'}</td>
+                            <td className="p-2 text-center font-bold text-amber-400">{bonus > 0 ? `+${bonus}` : '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'catchMe' && (
+              <div className="space-y-3">
+                <div className="border-b border-zinc-800 pb-2 flex justify-between items-center text-xs">
+                  <div>
+                    <h2 className="font-extrabold uppercase text-amber-400">⚔ Catch Me If You Can</h2>
+                    <p className="text-[10px] text-zinc-400">Vorrunde, Zwischenrunde, Lucky Loser & Finale</p>
+                  </div>
+                  <div className="flex gap-1">
+                    {role === 'admin' && <button onClick={handleShuffleBracket} className="bg-zinc-800 text-[10px] px-2 py-1 rounded font-bold">Neu</button>}
+                    <button onClick={() => setActiveTab('tagesablauf')} className="bg-zinc-900 text-zinc-300 px-2 py-1 rounded">← Zurück</button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl text-center text-xs">
+                  <div className="bg-zinc-950 p-2 rounded border border-zinc-800">
+                    <span className="text-[9px] text-zinc-400 font-bold block">🥈 2. Platz (20 Pkt)</span>
+                    <span className="font-black text-zinc-200 truncate block mt-0.5">{catchMePodium.p2 ? getTeamName(catchMePodium.p2) : 'Offen'}</span>
+                  </div>
+                  <div className="bg-amber-500/10 p-2 rounded border border-amber-500/30">
+                    <span className="text-[9px] text-amber-400 font-bold block">🥇 1. Platz (30 Pkt)</span>
+                    <span className="font-black text-amber-300 truncate block mt-0.5">{catchMePodium.p1 ? getTeamName(catchMePodium.p1) : 'Offen'}</span>
+                  </div>
+                  <div className="bg-zinc-950 p-2 rounded border border-zinc-800">
+                    <span className="text-[9px] text-zinc-400 font-bold block">🥉 3. Platz (10 Pkt)</span>
+                    <span className="font-black text-zinc-300 truncate block mt-0.5">{catchMePodium.p3 ? getTeamName(catchMePodium.p3) : 'Offen'}</span>
+                  </div>
+                </div>
+
+                <div className="flex bg-zinc-950 p-1 rounded-lg border border-zinc-800 text-[11px] font-bold">
+                  <button onClick={() => setActiveCatchMeTab('r1')} className={`flex-1 py-1 rounded ${activeCatchMeTab === 'r1' ? 'bg-amber-500 text-black' : 'text-zinc-400'}`}>Vorrunde</button>
+                  <button onClick={() => setActiveCatchMeTab('r2')} className={`flex-1 py-1 rounded ${activeCatchMeTab === 'r2' ? 'bg-amber-500 text-black' : 'text-zinc-400'}`}>Zwischenrunde</button>
+                  <button onClick={() => setActiveCatchMeTab('finals')} className={`flex-1 py-1 rounded ${activeCatchMeTab === 'finals' ? 'bg-amber-500 text-black' : 'text-zinc-400'}`}>Halbfinale & Finale</button>
+                </div>
+
+                {activeBracketState && activeCatchMeTab === 'r1' && (
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-bold text-zinc-400 uppercase">Vorrunde (Langsamste zuerst)</h3>
+                    {activeBracketState.r1.map((m, i) => {
+                      const canEdit = canEditMatch(m);
+                      return (
+                        <div key={m.id} className="border border-zinc-800 bg-zinc-900 rounded-xl p-2.5 space-y-1.5 text-xs">
+                          <span className="text-[9px] bg-zinc-950 text-amber-400 px-1.5 py-0.5 rounded font-mono font-bold">VORRUNDE #{i + 1}</span>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            <button disabled={!canEdit || !m.t1} onClick={() => handleSetWinner('r1', i, m.t1)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${m.winner === m.t1 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                              <span className="truncate">{m.t1 ? getTeamName(m.t1) : 'Freilos'}</span> {m.winner === m.t1 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                            </button>
+                            <button disabled={!canEdit || !m.t2} onClick={() => handleSetWinner('r1', i, m.t2)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${m.winner === m.t2 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                              <span className="truncate">{m.t2 ? getTeamName(m.t2) : 'Freilos'}</span> {m.winner === m.t2 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {activeBracketState && activeCatchMeTab === 'r2' && (
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-bold text-zinc-400 uppercase">Zwischenrunde</h3>
+                    {activeBracketState.r2.map((m, i) => {
+                      const canEdit = canEditMatch(m);
+                      return (
+                        <div key={m.id} className="border border-zinc-800 bg-zinc-900 rounded-xl p-2.5 space-y-1.5 text-xs">
+                          <span className="text-[9px] bg-zinc-950 text-amber-400 px-1.5 py-0.5 rounded font-mono font-bold">ZWISCHENRUNDE #{i + 1}</span>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            <button disabled={!canEdit || !m.t1} onClick={() => handleSetWinner('r2', i, m.t1)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${m.winner === m.t1 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                              <span className="truncate">{m.t1 ? getTeamName(m.t1) : 'Noch offen'}</span> {m.winner === m.t1 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                            </button>
+                            <button disabled={!canEdit || !m.t2} onClick={() => handleSetWinner('r2', i, m.t2)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${m.winner === m.t2 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                              <span className="truncate">{m.t2 ? getTeamName(m.t2) : 'Noch offen'}</span> {m.winner === m.t2 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {activeBracketState && activeCatchMeTab === 'finals' && (
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-zinc-400 uppercase">Halbfinale & Finale (inkl. Lucky Loser)</h3>
+                    {activeBracketState.r3.map((m, i) => {
+                      const canEdit = canEditMatch(m);
+                      return (
+                        <div key={m.id} className="border border-zinc-800 bg-zinc-900 rounded-xl p-2.5 space-y-1.5 text-xs">
+                          <span className="text-[9px] bg-zinc-950 text-amber-400 px-1.5 py-0.5 rounded font-mono font-bold">HALBFINALE #{i + 1}</span>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            <button disabled={!canEdit || !m.t1} onClick={() => handleSetWinner('r3', i, m.t1)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${m.winner === m.t1 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                              <span className="truncate">{m.t1 ? getTeamName(m.t1) : 'Noch offen'}</span> {m.winner === m.t1 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                            </button>
+                            <button disabled={!canEdit || !m.t2} onClick={() => handleSetWinner('r3', i, m.t2)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${m.winner === m.t2 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                              <span className="truncate">{m.t2 ? getTeamName(m.t2) : 'Noch offen'}</span> {m.winner === m.t2 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="border border-amber-500/40 bg-zinc-900 rounded-xl p-2.5 space-y-1.5 text-xs">
+                      <span className="text-[9px] bg-amber-500 text-black px-1.5 py-0.5 rounded font-mono font-black uppercase">FINALE</span>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        <button disabled={!canEditMatch(activeBracketState.r4.finale) || !activeBracketState.r4.finale.t1} onClick={() => handleSetWinner('finale', 0, activeBracketState.r4.finale.t1)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t1 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                          <span className="truncate">{activeBracketState.r4.finale.t1 ? getTeamName(activeBracketState.r4.finale.t1) : 'Noch offen'}</span> {activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t1 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                        </button>
+                        <button disabled={!canEditMatch(activeBracketState.r4.finale) || !activeBracketState.r4.finale.t2} onClick={() => handleSetWinner('finale', 0, activeBracketState.r4.finale.t2)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t2 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                          <span className="truncate">{activeBracketState.r4.finale.t2 ? getTeamName(activeBracketState.r4.finale.t2) : 'Noch offen'}</span> {activeBracketState.r4.finale.winner === activeBracketState.r4.finale.t2 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="border border-zinc-800 bg-zinc-900 rounded-xl p-2.5 space-y-1.5 text-xs">
+                      <span className="text-[9px] bg-zinc-950 text-amber-700 px-1.5 py-0.5 rounded font-mono font-bold uppercase">SPIEL UM PLATZ 3</span>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        <button disabled={!canEditMatch(activeBracketState.r4.platz3) || !activeBracketState.r4.platz3.t1} onClick={() => handleSetWinner('platz3', 0, activeBracketState.r4.platz3.t1)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${activeBracketState.r4.platz3.winner === activeBracketState.r4.platz3.t1 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                          <span className="truncate">{activeBracketState.r4.platz3.t1 ? getTeamName(activeBracketState.r4.platz3.t1) : 'Noch offen'}</span> {activeBracketState.r4.platz3.winner === activeBracketState.r4.platz3.t1 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                        </button>
+                        <button disabled={!canEditMatch(activeBracketState.r4.platz3) || !activeBracketState.r4.platz3.t2} onClick={() => handleSetWinner('platz3', 0, activeBracketState.r4.platz3.t2)} className={`p-2 rounded border text-left flex justify-between items-center text-xs ${activeBracketState.r4.platz3.winner === activeBracketState.r4.platz3.t2 ? 'bg-amber-500 text-black font-extrabold border-amber-600' : 'bg-zinc-950 border-zinc-800 text-zinc-300'}`}>
+                          <span className="truncate">{activeBracketState.r4.platz3.t2 ? getTeamName(activeBracketState.r4.platz3.t2) : 'Noch offen'}</span> {activeBracketState.r4.platz3.winner === activeBracketState.r4.platz3.t2 && <span className="text-[9px] bg-black text-amber-400 px-1 rounded">SIEG</span>}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'hauptrennen' && (
+              <div className="space-y-3 text-xs">
+                <div className="border-b border-zinc-800 pb-2 flex justify-between items-center">
+                  <div>
+                    <h2 className="font-extrabold uppercase text-amber-400">🏁 Destruction Derby</h2>
+                    <p className="text-[10px] text-zinc-400">3 Läufe (je 5 Pkt / Runde)</p>
+                  </div>
+                  <button onClick={() => setActiveTab('tagesablauf')} className="bg-zinc-900 text-zinc-300 px-2 py-1 rounded">← Zurück</button>
+                </div>
+
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-[10px] font-black uppercase text-amber-400">Startaufstellung (Live)</h3>
+                    <div className="flex bg-zinc-950 p-0.5 rounded border border-zinc-800 text-[10px] font-bold">
+                      <button onClick={() => setActiveRaceGrid(1)} className={`px-2 py-0.5 rounded ${activeRaceGrid === 1 ? 'bg-amber-500 text-black' : 'text-zinc-400'}`}>Lauf 1</button>
+                      <button onClick={() => setActiveRaceGrid(2)} className={`px-2 py-0.5 rounded ${activeRaceGrid === 2 ? 'bg-amber-500 text-black' : 'text-zinc-400'}`}>Lauf 2</button>
+                      <button onClick={() => setActiveRaceGrid(3)} className={`px-2 py-0.5 rounded ${activeRaceGrid === 3 ? 'bg-amber-500 text-black' : 'text-zinc-400'}`}>Lauf 3</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {currentGrid.map((team, idx) => (
+                      <div key={team.id} className="p-1 bg-zinc-950 rounded border border-zinc-800 text-[10px]">
+                        <span className="font-mono font-black text-amber-400">#{idx + 1}</span>
+                        <span className="font-bold text-zinc-200 truncate block">#{team.number} {team.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {!isRaceReleased && role !== 'admin' ? (
+                  <div className="bg-zinc-900 border border-amber-500/20 rounded-xl p-8 text-center space-y-3">
+                    <Lock className="w-10 h-10 text-amber-500 mx-auto animate-pulse" />
+                    <h3 className="font-extrabold text-sm uppercase text-zinc-200">Rundenzählung unter Verschluss</h3>
+                    <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                      Die Startaufstellung ist oben frei sichtbar. Die gefahrenen Runden pro Lauf werden von lauter Rennleitung im Hintergrund gezählt und erst nach Freigabe angezeigt!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                    <div className="divide-y divide-zinc-800">
+                      {activeTeamsList.map(team => {
+                        const editable = canEditTeam(team);
+                        return (
+                          <div key={team.id} className="p-2.5 space-y-2">
+                            <span className="font-extrabold text-zinc-200 block text-xs">#{team.number} {team.name}</span>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {['race1Laps', 'race2Laps', 'race3Laps'].map((rKey, rIdx) => (
+                                <div key={rKey} className="bg-zinc-950 p-1.5 rounded border border-zinc-800 text-center">
+                                  <span className="text-[8px] text-zinc-500 block">Lauf {rIdx + 1}</span>
+                                  <div className="flex justify-center items-center gap-1 my-1">
+                                    {editable && <button onClick={() => updateRaceLaps(team.id, rKey, -1)} className="px-1 bg-zinc-800 rounded text-[10px]">-</button>}
+                                    {editable ? (
+                                      <input type="number" value={team[rKey] || 0} onChange={(e) => setExactRaceLaps(team.id, rKey, e.target.value)} className="w-6 bg-transparent text-center font-mono font-bold text-xs" />
+                                    ) : (
+                                      <span className="font-mono font-bold text-xs w-6">{team[rKey] || 0}</span>
+                                    )}
+                                    {editable && <button onClick={() => updateRaceLaps(team.id, rKey, 1)} className="px-1 bg-zinc-800 rounded text-[10px]">+</button>}
+                                  </div>
+                                  <button onClick={() => toggleDriverChanges(team.id, `r${rIdx + 1}ChangesDone`)} disabled={!editable} className={`w-full py-0.5 text-[8px] font-bold rounded ${team[`r${rIdx + 1}ChangesDone`] ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-400'}`}>
+                                    {team[`r${rIdx + 1}ChangesDone`] ? '✔ 3x Wechsel' : 'Wechsel'}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'regeln' && (
+              <div className="space-y-3 text-xs">
+                <div className="border-b border-zinc-800 pb-2">
+                  <h2 className="font-extrabold uppercase text-amber-400">📜 Offizielles Regelwerk 2026</h2>
+                </div>
+                <div className="space-y-2.5">
+                  <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl space-y-2">
+                    {(role === 'admin' || role === 'team') && (
+                      <div>
+                        <h3 className="font-bold text-amber-400 uppercase text-[11px]">Allgemeines</h3>
+                        <p className="text-zinc-300 text-[11px]">Startgeld: 60€ | Abgabe: 28.08.2026 (20 Uhr) | Anwesenheit: 9 Uhr</p>
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-bold text-amber-400 uppercase text-[11px]">Fahrzeug & Fahrer</h3>
+                      <p className="text-amber-500 font-semibold mb-1 text-[11px]">Technische Abnahme: 09:30 Uhr!</p>
+                      <ul className="list-disc list-inside space-y-1 text-zinc-300 text-[11px]">
+                        <li>PKW mit funktionstüchtigem Schalldämpfer</li>
+                        <li>Räder müssen abgedeckt sein</li>
+                        <li>Airbags ausgebaut/abgeklemmt</li>
+                        <li>Integralhelm & festes Schuhwerk Pflicht</li>
+                        <li>Keine Minderjährigen als Beifahrer</li>
+                        {(role === 'admin' || role === 'team') && <li className="text-red-400 font-bold">Wer zu betrunken ist, wird disqualifiziert.</li>}
+                        <li>Alle Rennen müssen zu zweit gefahren werden</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl space-y-2">
+                    <h3 className="font-bold text-amber-400 uppercase text-[11px]">Disziplinen & Punkte</h3>
+                    <p className="text-zinc-300 text-[11px]"><strong>Ringstechen:</strong> 5 Versuche, je 5 Pkt.</p>
+                    <p className="text-zinc-300 text-[11px]"><strong>Beste Runde:</strong> LeMans Start (Addition beider Fahrerzeiten). Extra Pokal!</p>
+                    <p className="text-zinc-300 text-[11px]"><strong>Catch Me If You Can:</strong> Kattberger Spezial (Vorrunde, Zwischenrunde, Lucky Loser & Finale).</p>
+                    <p className="text-zinc-300 text-[11px]"><strong>Destruction Derby:</strong> 3 Läufe (je 5 Pkt / Runde). 3x Fahrerwechsel-Pflicht pro Lauf.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          {showPinModal && (
+            <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+              <form onSubmit={handleLoginSubmit} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full max-w-xs space-y-3 text-xs">
+                <h3 className="font-black text-sm uppercase text-center text-amber-400">Login</h3>
+                <div className="flex bg-zinc-950 p-1 rounded border border-zinc-800 font-bold">
+                  <button type="button" onClick={() => setLoginType('admin')} className={`flex-1 py-1.5 rounded ${loginType === 'admin' ? 'bg-amber-500 text-black' : 'text-zinc-500'}`}>Admin</button>
+                  <button type="button" onClick={() => setLoginType('team')} className={`flex-1 py-1.5 rounded ${loginType === 'team' ? 'bg-blue-500 text-white' : 'text-zinc-500'}`}>Team</button>
+                  <button type="button" onClick={() => setLoginType('tv')} className={`flex-1 py-1.5 rounded ${loginType === 'tv' ? 'bg-purple-500 text-white' : 'text-zinc-500'}`}>TV</button>
+                </div>
+                {loginType === 'team' && <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded p-2">{teams.map(t => <option key={t.id} value={t.id}>#{t.number} {t.name}</option>)}</select>}
+                {loginType === 'tv' && <div className="text-center text-zinc-400 font-mono py-1">Fernseher-Modus (Code benötigt)</div>}
+                <input type="password" placeholder="PIN" value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded p-2.5 text-center text-base font-mono text-zinc-100" required />
+                {pinError && <span className="text-red-500 font-bold block text-center">Falscher PIN!</span>}
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setShowPinModal(false)} className="flex-1 py-2 bg-zinc-800 rounded font-bold">Abbrechen</button>
+                  <button type="submit" className="flex-1 py-2 bg-amber-500 text-black rounded font-bold">Login</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {confirmModal.isOpen && (
+            <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full max-w-xs text-center space-y-3 text-xs">
+                <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
+                <h3 className="font-black text-sm uppercase">{confirmModal.title}</h3>
+                <p className="text-zinc-400">{confirmModal.message}</p>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setConfirmModal({ isOpen: false, title: '', message: '', action: null })} className="flex-1 py-2 bg-zinc-800 rounded font-bold">Abbrechen</button>
+                  <button onClick={confirmModal.action} className="flex-1 py-2 bg-red-600 text-white rounded font-bold">Ja</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showShareModal && (
+            <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full max-w-xs text-center space-y-3 text-xs">
+                <h3 className="font-black text-sm uppercase text-amber-400">Handys koppeln</h3>
+                <div className="bg-white p-2.5 rounded inline-block mx-auto">
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl || getPublicUrl())}`} alt="QR" className="w-36 h-36 block mx-auto" />
+                </div>
+                <input type="text" value={shareUrl} onChange={(e) => setShareUrl(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded p-1.5 text-[10px] text-amber-400 font-mono" />
+                <button onClick={copyShareLink} className="w-full py-2 bg-zinc-800 text-zinc-200 rounded font-bold">{copiedLink ? 'Kopiert!' : 'Link kopieren'}</button>
+                <button onClick={() => setShowShareModal(false)} className="w-full py-2 bg-amber-500 text-black rounded font-bold">Zurück</button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
